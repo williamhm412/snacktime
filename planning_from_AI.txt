@@ -1,18 +1,22 @@
 EXECUTIVE SUMMARY
 =================
 "SnackTime" — an app to reduce food waste. Built in TypeScript end-to-end.
+LIVE at https://snacktime.pages.dev (renamed from FoodSaver, was local-only).
 
-Structure:
-  - Two parts in one project (npm workspaces):
-      server/  → Node + Express API. Saves all food items in a plain JSON
-                 file: server/data/foods.json (you can open it anytime and
-                 watch it update as you use the app).
-      client/  → React + Vite front end. Phone-style layout with a bottom
-                 nav bar and 3 tabs: List, Add, Ideas.
-  - Everything runs locally on this computer. Start both parts with:
-        npm run dev
-    Then open http://localhost:5173 in a browser (use phone-width window for
-    the app feel).
+Structure (Cloudflare):
+  - client/    → React + Vite front end (bottom nav: List, Add, Ideas),
+                 served as Pages static assets
+  - functions/ → Pages Functions: the /api/* backend (same endpoints as before)
+  - shared/    → backend core: KV storage, recipe schema validation, Gemini
+                 prompt/generation, weekly-digest stub
+  - data       → Cloudflare Workers KV namespace SNACKTIME_DB (foods, cached
+                 ideas, email outbox, generation lock) — replaced the old
+                 server/data/*.json files
+  - AI         → Gemini free tier (gemini-3.5-flash), key stored as a Pages
+                 secret (never in the repo); mock generator when no key
+  - GitHub     → github.com/williamhm412/snacktime (private); deploy = npm run deploy
+  - dev        → npm run dev (pages dev on :8788 + vite; local KV is separate
+                 from production; add GEMINI_API_KEY to .dev.vars for real AI locally)
 
 Key decisions:
   - Data lives in the file system (server/data/foods.json) — no database to

@@ -1,52 +1,69 @@
 # SnackTime 🥕
 
-A locally hosted app to reduce food waste: log food + expiration dates, see what's
-expiring soon, and (soon) get AI recipe ideas for it.
+Reduce food waste: log food + expiration dates, see what's expiring soon, and get
+**AI recipe ideas** (Gemini) for using it up — 3 combined "Use It All" meals plus
+2 solo ideas per expiring food. Weekly digest emails coming (real sending = T12).
 
-## Run it
+**Live app:** https://snacktime.pages.dev
+**Repo:** https://github.com/williamhm412/snacktime (private)
+
+## Architecture
+
+| Piece | Tech | Where |
+|---|---|---|
+| Frontend | React + Vite (TypeScript) | `client/` → built to `client/dist` |
+| Backend API | Cloudflare Pages Functions | `functions/api/[[path]].ts` |
+| Shared logic (store, AI, validation) | TypeScript | `shared/api-core.ts` |
+| Database | Cloudflare Workers KV (`SNACKTIME_DB`) | keys: `foods`, `ideas`, outbox, lock |
+| AI recipes | Gemini free tier (`gemini-3.5-flash`) | key stored as Pages **secret** `GEMINI_API_KEY` |
+| Hosting | Cloudflare Pages | project `snacktime` → snacktime.pages.dev |
+
+Config lives in `wrangler.toml` (KV namespace id + output dir).
+
+Notes:
+- AI responses must match a strict recipe JSON schema (prep/cook time, servings,
+  ingredients with BOTH volume + weight measures, instructions, comments); invalid
+  output is retried once, then rejected with a friendly error.
+- Ideas regenerate automatically: first Ideas-tab open each day, when food enters
+  the 7-day window, and when your list changes. Manual ↻ additionally forbids the
+  AI from reusing the current ideas.
+- Weekly email is a dev stub (digest saved to KV `outbox:latest`). Pages has no
+  cron — wire real email + a scheduler in T12 (options: external cron hitting
+  `/api/email/send-now`, or move to a full Worker with Cron Triggers).
+
+## Local development
 
 ```bash
-npm install     # once
-npm run dev     # starts backend + frontend together
+npm install
+npm run dev        # starts BOTH:
+                   #  - wrangler pages dev  → API on :8788 (local KV simulation)
+                   #  - vite dev            → UI on :5173 (or :5174 if busy)
 ```
 
-Then open **http://localhost:5173** in a browser
-(narrow the window to phone width for the app feel).
+Open the Vite URL it prints (check the port — other projects may grab 5173).
+Local AI runs in **mock mode** (no key loaded) — set `GEMINI_API_KEY` in a root
+`.dev.vars` file to test real Gemini locally.
 
-## Structure
+## Deploy
 
-| Part | Where | Notes |
-|---|---|---|
-| Backend | `server/` | Express API on port 3001 |
-| Data | `server/data/foods.json` | plain JSON, updates live as you use the app |
-| Email digests | `server/data/outbox/` | weekly digest dev stub (real email later) |
-| Frontend | `client/` | React + Vite on port 5173, proxies `/api` to the backend |
+```bash
+npm run deploy     # build client + wrangler pages deploy client/dist
+```
+
+Then push code too: `git add -A && git commit && git push`.
+(Prod secret management: `npx wrangler pages secret put GEMINI_API_KEY --project-name=snacktime`)
 
 ## API
 
-- `GET /api/foods?sort=added|expiry` — list food
-- `POST /api/foods` — add `{ "name": "...", "expDate": "YYYY-MM-DD" }`
-- `DELETE /api/foods/:id` — mark as used / remove
-- `POST /api/email/send-now` — write a weekly-digest file to the outbox on demand
-- `GET /api/ideas` — cached AI ideas + status
-- `POST /api/ideas/refresh` — regenerate if stale, or `{ "force": true }` to always redo
-
-## AI recipe ideas
-
-Recipes come from **Gemini (free tier)** with a strict JSON schema so responses always
-match the app's recipe format. Ideas regenerate automatically when you first open the
-Ideas tab each day, when a food enters the 7-day expiry window, and when your list changes.
-
-**Enable real AI (one-time, ~2 minutes):**
-1. Get a free key at https://aistudio.google.com/apikey
-2. `cp server/.env.example server/.env`
-3. Paste the key after `GEMINI_API_KEY=` and restart (`npm run dev`)
-
-Without a key, the Ideas tab shows clearly-labeled *demo* recipes from a built-in mock
-so the whole UI still works offline. Cached AI ideas live in `server/data/ideas.json`.
+- `GET /api/foods?sort=added|expiry`
+- `POST /api/foods` — `{ "name": "...", "expDate": "YYYY-MM-DD" }`
+- `DELETE /api/foods/:id`
+- `GET /api/ideas` — cached ideas + generating status
+- `POST /api/ideas/refresh` — regenerate if stale; `{ "force": true }` = new batch, no repeats
+- `POST /api/email/send-now` — build weekly digest (dev stub → KV outbox)
+- `GET /api/health`
 
 ## Docs
 
-- `planning.txt` — the original product plan (yours)
-- `planning_from_AI.txt` — build plan + executive summary from me
-- `taks.txt` — task tracker, updated as we work
+- `planning.txt` — original product plan · `planning_from_AI.txt` — build notes
+- `taks.txt` — running task tracker

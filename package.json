@@ -2,17 +2,19 @@
   "name": "snacktime",
   "private": true,
   "version": "0.1.0",
-  "description": "SnackTime — reduce food waste. Locally hosted React + Express app.",
+  "description": "SnackTime \u2014 reduce food waste. React + Cloudflare Pages (Functions + KV).",
   "workspaces": [
-    "server",
     "client"
   ],
   "scripts": {
-    "dev": "concurrently -n server,client -c green,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
-    "start": "npm run start -w server & npm run preview -w client",
-    "build": "npm run build -w client"
+    "dev": "concurrently -n api,client -c green,cyan \"npm run cfdev\" \"npm run dev -w client\"",
+    "cfdev": "wrangler pages dev client/dist --port 8788 --persist-to .wrangler/state",
+    "build": "npm run build -w client",
+    "deploy": "npm run build && wrangler pages deploy client/dist"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "@cloudflare/workers-types": "^5.20261114.1",
+    "concurrently": "^9.1.2",
+    "wrangler": "^4.162.0"
   }
 }

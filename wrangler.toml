@@ -1,0 +1,8 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "snacktime"
+compatibility_date = "2026-11-13"
+pages_build_output_dir = "client/dist"
+
+[[kv_namespaces]]
+binding = "SNACKTIME_DB"
+id = "4abf068737a64c79ad5e44202bbf30c5"

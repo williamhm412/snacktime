@@ -6,8 +6,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // forward /api/... calls to the Express backend during development
-      "/api": "http://localhost:3001",
+      // forward /api/... calls to `wrangler pages dev` during development
+      "/api": "http://localhost:8788",
     },
   },
 });

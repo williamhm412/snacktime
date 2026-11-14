@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { addFood } from "../api";
+import { addFood, refreshIdeas } from "../api";
 import { localISODate } from "../dates";
 
 export default function AddScreen({ onAdded }: { onAdded: () => void }) {
@@ -15,6 +15,7 @@ export default function AddScreen({ onAdded }: { onAdded: () => void }) {
     setError(null);
     try {
       await addFood(name.trim(), expDate);
+      refreshIdeas(false).catch(() => {}); // background: keep ideas in sync
       onAdded(); // bounce back to the list, like Venmo's "done" flow
     } catch (err) {
       setError((err as Error).message);
