@@ -7,6 +7,16 @@ export type Tab = "list" | "add" | "ideas";
 
 const TABS: { id: Tab; label: string; icon: JSX.Element }[] = [
   {
+    id: "add",
+    label: "Add",
+    icon: (
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 8.5v7M8.5 12h7" />
+      </svg>
+    ),
+  },
+  {
     id: "ideas",
     label: "Ideas",
     icon: (
@@ -22,16 +32,6 @@ const TABS: { id: Tab; label: string; icon: JSX.Element }[] = [
     icon: (
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
         <path d="M4 6.5h16M4 12h16M4 17.5h10" />
-      </svg>
-    ),
-  },
-  {
-    id: "add",
-    label: "Add",
-    icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-        <circle cx="12" cy="12" r="8.5" />
-        <path d="M12 8.5v7M8.5 12h7" />
       </svg>
     ),
   },
