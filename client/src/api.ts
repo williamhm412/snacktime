@@ -42,10 +42,26 @@ export function getIdeas(): Promise<IdeasView> {
   return api<IdeasView>("/api/ideas");
 }
 
-export function refreshIdeas(force = false): Promise<IdeasView> {
-  return api<IdeasView>("/api/ideas/refresh", {
+interface RefreshResponse {
+  view: IdeasView;
+  startGeneration: boolean;
+}
+
+/** Fire-and-forget: the OPEN request itself drives the AI while it runs. */
+function fireGenerate(force: boolean): void {
+  api<IdeasView>("/api/ideas/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ force }),
+  }).catch(() => {}); // result arrives via the poller; errors here are non-fatal
+}
+
+export async function refreshIdeas(force = false): Promise<IdeasView> {
+  const r = await api<RefreshResponse>("/api/ideas/refresh", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ force }),
   });
+  if (r.startGeneration) fireGenerate(force);
+  return r.view;
 }

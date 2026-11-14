@@ -3,12 +3,12 @@
 import type { PagesFunction } from "@cloudflare/workers-types";
 import {
   addFood,
-  daysUntil,
   deleteFood,
-  ensureFreshIdeas,
+  generateIdeasNow,
   getIdeasView,
   listFoods,
   parseUser,
+  refreshIdeasView,
   sendWeeklyDigest,
   type Env,
   type SortMode,
@@ -61,20 +61,13 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
         return json({ error: "expDate must be a valid date (YYYY-MM-DD)" }, 400);
       }
       const item = await addFood(env, scope, name, expDate);
-      // keep ideas in sync without delaying the response (client also re-syncs)
-      if (daysUntil(item.expDate) <= 7) {
-        ctx.waitUntil(ensureFreshIdeas(env, scope, ctx.waitUntil));
-      }
-      return json(item, 201);
+      return json(item, 201); // client re-syncs ideas itself (refresh → generate)
     }
 
     const foodMatch = path.match(/^\/api\/foods\/([\w-]+)$/);
     if (foodMatch && method === "DELETE") {
       const removed = await deleteFood(env, scope, foodMatch[1]);
       if (!removed) return json({ error: "food item not found" }, 404);
-      if (daysUntil(removed.expDate) <= 7) {
-        ctx.waitUntil(ensureFreshIdeas(env, scope, ctx.waitUntil));
-      }
       return new Response(null, { status: 204 });
     }
 
@@ -85,7 +78,13 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 
     if (path === "/api/ideas/refresh" && method === "POST") {
       const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-      return json(await ensureFreshIdeas(env, scope, ctx.waitUntil, body?.force === true));
+      return json(await refreshIdeasView(env, scope, body?.force === true));
+    }
+
+    // synchronous generation: the client holds this request open while the AI works
+    if (path === "/api/ideas/generate" && method === "POST") {
+      const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+      return json(await generateIdeasNow(env, scope, body?.force === true));
     }
 
     /* ── /api/email (dev stub) ──────────────────────────────────────── */

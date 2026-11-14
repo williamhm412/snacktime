@@ -12,6 +12,7 @@ export interface Ingredient {
 }
 
 export interface RecipeIdea {
+  set: "expiring" | "pantry"; // which idea collection it belongs to
   scope: "combined" | "single";
   usesFoodIds: string[];
   title: string;
@@ -26,7 +27,8 @@ export interface RecipeIdea {
 export interface IdeasDoc {
   generatedAt: string;
   generator: string;
-  foodSnapshot: string[];
+  foodSnapshot: string[]; // all pantry ids
+  expiringSnapshot: string[]; // ids expiring within 7 days
   ideas: RecipeIdea[];
 }
 

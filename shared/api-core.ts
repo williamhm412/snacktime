@@ -29,6 +29,7 @@ export interface Ingredient {
 }
 
 export interface RecipeIdea {
+  set: "expiring" | "pantry"; // which tab this idea belongs to
   scope: "combined" | "single";
   usesFoodIds: string[];
   title: string;
@@ -43,7 +44,8 @@ export interface RecipeIdea {
 export interface IdeasDoc {
   generatedAt: string;
   generator: string;
-  foodSnapshot: string[];
+  foodSnapshot: string[]; // ALL pantry ids (stale check when the list changes)
+  expiringSnapshot: string[]; // ids expiring within 7 days
   ideas: RecipeIdea[];
 }
 
@@ -52,6 +54,12 @@ export interface IdeasView {
   generating: boolean;
   cache: IdeasDoc | null;
   error: string | null;
+}
+
+export interface RefreshResult {
+  view: IdeasView;
+  /** true = ideas are stale and nobody is generating: client should POST /api/ideas/generate */
+  startGeneration: boolean;
 }
 
 /* ── User scope (temporary multi-user: one set of KV keys per person) ─── */
@@ -156,6 +164,8 @@ function str(v: unknown, max = 600): string {
 function validateIdea(raw: unknown, knownIds: Set<string>): RecipeIdea | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
+  const set = r.set === "pantry" ? "pantry" : r.set === "expiring" ? "expiring" : null;
+  if (!set) return null;
   const scope = r.scope === "single" ? "single" : r.scope === "combined" ? "combined" : null;
   if (!scope) return null;
   const title = str(r.title, 160);
@@ -188,6 +198,7 @@ function validateIdea(raw: unknown, knownIds: Set<string>): RecipeIdea | null {
   const servingsRaw = Math.round(Number(r.servings));
 
   return {
+    set,
     scope,
     usesFoodIds,
     title,
@@ -228,6 +239,7 @@ const RESPONSE_SCHEMA = {
       items: {
         type: "object",
         properties: {
+          set: { type: "string", enum: ["expiring", "pantry"] },
           scope: { type: "string", enum: ["combined", "single"] },
           usesFoodIds: { type: "array", items: { type: "string" } },
           title: { type: "string" },
@@ -257,26 +269,36 @@ const RESPONSE_SCHEMA = {
           instructions: { type: "array", items: { type: "string" } },
           comments: { type: "string" },
         },
-        required: ["scope", "usesFoodIds", "title", "whyThisOne", "servings", "times", "ingredients", "instructions", "comments"],
+        required: ["set", "scope", "usesFoodIds", "title", "whyThisOne", "servings", "times", "ingredients", "instructions", "comments"],
       },
     },
   },
   required: ["ideas"],
 };
 
-export function buildPrompt(foods: AiFood[], singleIds: Set<string>, priorError?: string | null, avoidTitles?: string[]): string {
-  const singleNames = foods.filter((f) => singleIds.has(f.id)).map((f) => f.name);
-  return `The user has these foods expiring within the next 7 days (each has an "id" you must reference):
-${JSON.stringify(foods, null, 2)}
+export function buildPrompt(expiring: AiFood[], pantryExtras: AiFood[], priorError?: string | null, avoidTitles?: string[]): string {
+  const sectionA = expiring.length
+    ? `SECTION A — every idea in this section must have "set": "expiring".
+A1. Exactly 3 "combined" ideas — complete meals that use as MANY of the EXPIRING items together as possible (at least 2 expiring items each, ideally more). Varied cuisines and cooking methods.
+A2. Exactly 2 "single" ideas for EACH expiring item (${expiring.map((f) => f.name).join(", ")}). Quick, realistic ideas where that food is the star; set usesFoodIds to just that one food's id.`
+    : "";
+  const sectionB = `SECTION B — every idea in this section must have "set": "pantry".
+B1. Exactly 3 "combined" ideas — complete meals built around the WHOLE pantry (items ${expiring.length ? "that do AND that do not " : ""}expire soon; pick a different mix per meal). These must be DIFFERENT dishes from Section A${expiring.length ? " (do not repeat or rename Section A meals)" : ""}.
+B2. Exactly 2 "single" ideas for EACH of these items: ${pantryExtras.length ? pantryExtras.map((f) => f.name).join(", ") : "(none)"}. Quick, realistic ideas where that food is the star; set usesFoodIds to just that one food's id.`;
 
-Create recipe IDEAS for a JSON response with an "ideas" array, containing:
-1. Exactly 3 "combined" ideas — complete meals that use as MANY of the listed items together as possible (at least 2 tracked items each, ideally more). Make them varied (different cuisines and cooking methods).
-2. Exactly 2 "single" ideas for EACH of these foods: ${singleNames.join(", ")}. Quick, realistic ideas where that food is the star. Set usesFoodIds to just that one food's id.
+  return `The user has food in their kitchen. Two lists (each item has an "id" you must reference):
+EXPIRING within the next 7 days:
+${JSON.stringify(expiring, null, 2)}
+NOT expiring within 7 days (still in the pantry):
+${JSON.stringify(pantryExtras, null, 2)}
+
+Create recipe IDEAS as a JSON response with an "ideas" array. ${sectionA ? sectionA + "\n\n" : ""}${sectionB}
 ${avoidTitles && avoidTitles.length ? `
 The user already saw and passed on these ideas — do NOT reuse or slightly-renamed-reuse ANY of them. Invent completely different dishes, techniques, and cuisines:
 ${avoidTitles.map((t) => `- ${t}`).join("\n")}
 ` : ""}
 Rules:
+- Every idea object needs ALL schema fields, including "set" ("expiring" for Section A, "pantry" for Section B).
 - Pantry staples are assumed on hand: oil, butter, salt, pepper, soy sauce, vinegar, sugar, honey, flour, rice, pasta, oats, common spices, onions, garlic, lemons. Only list other ingredients that are truly needed, always with amounts.
 - Every ingredient needs BOTH measures where sensible: "volume" in US units (cups/tbsp/tsp, or counting units like qty:2 unit:"cloves" or qty:2 unit:"medium") and "weight" in metric (g or ml). Use null for whichever genuinely doesn't apply. Put prep notes like "diced" in volume.note.
 - For an ingredient that IS one of the user's tracked foods, set trackedFoodId to that food's EXACT id string (copy it character-for-character). For pantry/other ingredients set trackedFoodId to null.
@@ -347,48 +369,60 @@ function mockInstructions(name: string, style: string): string[] {
   ];
 }
 
-function generateWithMock(foods: AiFood[]): string {
+function generateWithMock(expiring: AiFood[], pantryExtras: AiFood[]): string {
   const ideas: unknown[] = [];
-  const names = foods.map((f) => f.name);
-  const a = names[0] ?? "veg";
-  const b = names[1] ?? names[0] ?? "grain";
-  COMBINED_TEMPLATES.forEach((t, i) => {
-    const uses = foods.slice(0, Math.min(foods.length, i === 0 ? 3 : 2));
-    ideas.push({
-      scope: "combined",
-      usesFoodIds: uses.map((f) => f.id),
-      title: t.title(a, b),
-      whyThisOne: `Uses up ${uses.map((f) => f.name.toLowerCase()).join(" and ")} in ${t.cuisine}.`,
-      servings: 4,
-      times: { prepMinutes: 10 + i * 5, cookMinutes: 20 + i * 5 },
-      ingredients: [
-        ...uses.map((f, j) => ({ name: f.name, trackedFoodId: f.id, optional: false, measures: measureFor(i + j) })),
-        { name: "cooked rice", trackedFoodId: null, optional: false, measures: { weight: { qty: 450, unit: "g" }, volume: { qty: 3, unit: "cups", note: "cooked" } } },
-      ],
-      instructions: mockInstructions(a, i === 1 ? "stir" : "pan"),
-      comments: "Mock idea — set GEMINI_API_KEY as a Pages secret for real AI recipes.",
-    });
-  });
-  for (const f of foods) {
-    SINGLE_TEMPLATES.forEach((t, i) => {
+  const combinedFor = (set: "expiring" | "pantry", foods: AiFood[]) => {
+    const names = foods.map((f) => f.name);
+    const a = names[0] ?? "veg";
+    const b = names[1] ?? names[0] ?? "grain";
+    COMBINED_TEMPLATES.forEach((t, i) => {
+      const uses = foods.slice(0, Math.min(foods.length, i === 0 ? 3 : 2));
       ideas.push({
-        scope: "single",
-        usesFoodIds: [f.id],
-        title: t(f.name),
-        whyThisOne: `An easy way to use up your ${f.name.toLowerCase()} before it turns.`,
-        servings: 2,
-        times: { prepMinutes: 5 + i * 5, cookMinutes: 15 + i * 10 },
+        set,
+        scope: "combined",
+        usesFoodIds: uses.map((f) => f.id),
+        title: set === "pantry" ? `${t.title(a, b)} (pantry-style)` : t.title(a, b),
+        whyThisOne: `Uses up ${uses.map((f) => f.name.toLowerCase()).join(" and ")} in ${t.cuisine}.`,
+        servings: 4,
+        times: { prepMinutes: 10 + i * 5, cookMinutes: 20 + i * 5 },
         ingredients: [
-          { name: f.name, trackedFoodId: f.id, optional: false, measures: measureFor(i) },
-          { name: "cooked rice", trackedFoodId: null, optional: false, measures: { weight: { qty: 300, unit: "g" }, volume: { qty: 2, unit: "cups", note: "cooked" } } },
-          { name: "onion", trackedFoodId: null, optional: false, measures: { weight: { qty: 110, unit: "g" }, volume: { qty: 1, unit: "medium", note: "diced" } } },
-          { name: "garlic", trackedFoodId: null, optional: true, measures: { weight: { qty: 6, unit: "g" }, volume: { qty: 2, unit: "cloves", note: null } } },
+          ...uses.map((f, j) => ({ name: f.name, trackedFoodId: f.id, optional: false, measures: measureFor(i + j) })),
+          { name: "cooked rice", trackedFoodId: null, optional: false, measures: { weight: { qty: 450, unit: "g" }, volume: { qty: 3, unit: "cups", note: "cooked" } } },
         ],
-        instructions: mockInstructions(f.name, i === 0 ? "stir" : "pan"),
+        instructions: mockInstructions(a, i === 1 ? "stir" : "pan"),
         comments: "Mock idea — set GEMINI_API_KEY as a Pages secret for real AI recipes.",
       });
     });
+  };
+  const singlesFor = (set: "expiring" | "pantry", foods: AiFood[]) => {
+    for (const f of foods) {
+      SINGLE_TEMPLATES.forEach((t, i) => {
+        ideas.push({
+          set,
+          scope: "single",
+          usesFoodIds: [f.id],
+          title: set === "pantry" ? `${t(f.name)} (meal-prep twist)` : t(f.name),
+          whyThisOne: `An easy way to use up your ${f.name.toLowerCase()}.`,
+          servings: 2,
+          times: { prepMinutes: 5 + i * 5, cookMinutes: 15 + i * 10 },
+          ingredients: [
+            { name: f.name, trackedFoodId: f.id, optional: false, measures: measureFor(i) },
+            { name: "cooked rice", trackedFoodId: null, optional: false, measures: { weight: { qty: 300, unit: "g" }, volume: { qty: 2, unit: "cups", note: "cooked" } } },
+            { name: "onion", trackedFoodId: null, optional: false, measures: { weight: { qty: 110, unit: "g" }, volume: { qty: 1, unit: "medium", note: "diced" } } },
+            { name: "garlic", trackedFoodId: null, optional: true, measures: { weight: { qty: 6, unit: "g" }, volume: { qty: 2, unit: "cloves", note: null } } },
+          ],
+          instructions: mockInstructions(f.name, i === 0 ? "stir" : "pan"),
+          comments: "Mock idea — set GEMINI_API_KEY as a Pages secret for real AI recipes.",
+        });
+      });
+    }
+  };
+  if (expiring.length) {
+    combinedFor("expiring", expiring);
+    singlesFor("expiring", expiring);
   }
+  combinedFor("pantry", [...expiring, ...pantryExtras]);
+  singlesFor("pantry", pantryExtras);
   return JSON.stringify({ ideas });
 }
 
@@ -409,42 +443,73 @@ export async function getIdeasView(env: Env, scope: Scope): Promise<IdeasView> {
  * Returns the current view and, if stale (new day / changed expiring list)
  * or forced, kicks off regeneration in the background (waitUntil).
  */
-export async function ensureFreshIdeas(
-  env: Env,
-  scope: Scope,
-  waitUntil: (p: Promise<unknown>) => void,
-  force = false
-): Promise<IdeasView> {
+/* Ideas generation, client-driven:
+   the browser asks /api/ideas/refresh, and when it says startGeneration it
+   opens (fire-and-forget) /api/ideas/generate and keeps that request live.
+   Generation then runs INSIDE a live request — no deferred server work that
+   the runtime can silently freeze while Gemini hangs. */
+
+const LOCK_FRESH_MS = 130_000; // a lock younger than this = a real generation is in flight
+
+function lockIsFresh(raw: string | null): boolean {
+  if (raw == null) return false;
+  const t = Number(raw);
+  return Number.isFinite(t) && Date.now() - t < LOCK_FRESH_MS;
+}
+
+function isFreshDoc(doc: IdeasDoc | null, allFoods: FoodItem[], soon: FoodItem[]): boolean {
+  return (
+    doc != null &&
+    new Date(doc.generatedAt).toDateString() === new Date().toDateString() &&
+    JSON.stringify(doc.foodSnapshot) === JSON.stringify(allFoods.map((f) => f.id).sort()) &&
+    JSON.stringify(doc.expiringSnapshot) === JSON.stringify(soon.map((f) => f.id).sort())
+  );
+}
+
+export async function refreshIdeasView(env: Env, scope: Scope, force = false): Promise<RefreshResult> {
+  const foods = await readJson<FoodItem[]>(env, kFoods(scope), []);
+  const soon = expiringSoon(foods);
+  const doc = await readJson<IdeasDoc | null>(env, kIdeas(scope), null);
+  const view = await getIdeasView(env, scope);
+
+  if (!force && isFreshDoc(doc, foods, soon)) return { view, startGeneration: false };
+  if (lockIsFresh(await env.SNACKTIME_DB.get(kIdeasLock(scope)))) return { view, startGeneration: false };
+
+  return { view: { ...view, status: "generating", generating: true }, startGeneration: true };
+}
+
+/** Synchronous generation — the caller's open request keeps this alive. */
+export async function generateIdeasNow(env: Env, scope: Scope, force: boolean): Promise<IdeasView> {
   const foods = await readJson<FoodItem[]>(env, kFoods(scope), []);
   const soon = expiringSoon(foods);
   const doc = await readJson<IdeasDoc | null>(env, kIdeas(scope), null);
 
-  const fresh =
-    doc != null &&
-    new Date(doc.generatedAt).toDateString() === new Date().toDateString() &&
-    JSON.stringify(doc.foodSnapshot) === JSON.stringify(soon.map((f) => f.id).sort());
+  if (!force && isFreshDoc(doc, foods, soon)) return getIdeasView(env, scope);
+  if (lockIsFresh(await env.SNACKTIME_DB.get(kIdeasLock(scope)))) return getIdeasView(env, scope);
 
-  if (!force && fresh) return getIdeasView(env, scope);
-  if (await env.SNACKTIME_DB.get(kIdeasLock(scope))) return getIdeasView(env, scope); // one at a time
-
-  // claim the generation lock (TTL clears it if the worker dies mid-run)
-  await env.SNACKTIME_DB.put(kIdeasLock(scope), String(Date.now()), { expirationTtl: 600 });
+  await env.SNACKTIME_DB.put(kIdeasLock(scope), String(Date.now()), { expirationTtl: 180 });
   const avoid = force && doc ? doc.ideas.map((i) => i.title) : [];
-  waitUntil(generateAndSave(env, scope, soon, avoid));
+  await generateAndSave(env, scope, foods, soon, avoid);
   return getIdeasView(env, scope);
 }
 
-async function generateAndSave(env: Env, scope: Scope, soon: FoodItem[], avoidTitles: string[]): Promise<void> {
+async function generateAndSave(env: Env, scope: Scope, allFoods: FoodItem[], soon: FoodItem[], avoidTitles: string[]): Promise<void> {
   try {
     await env.SNACKTIME_DB.delete(kIdeasError(scope));
-    if (soon.length === 0) {
-      await kvPut(env, kIdeas(scope), JSON.stringify({ generatedAt: new Date().toISOString(), generator: "none", foodSnapshot: [], ideas: [] }), scope.ttl);
+    if (allFoods.length === 0) {
+      await kvPut(env, kIdeas(scope), JSON.stringify({ generatedAt: new Date().toISOString(), generator: "none", foodSnapshot: [], expiringSnapshot: [], ideas: [] }), scope.ttl);
       return;
     }
-    const singleFoods = soon.slice(0, 8);
-    const knownIds = new Set(soon.map((f) => f.id));
-    const aiFoods: AiFood[] = soon.map((f) => ({ id: f.id, name: f.name, expDate: f.expDate, daysLeft: daysUntil(f.expDate) }));
-    const singleIds = new Set(singleFoods.map((f) => f.id));
+    const toAi = (f: FoodItem): AiFood => ({ id: f.id, name: f.name, expDate: f.expDate, daysLeft: daysUntil(f.expDate) });
+    const soonIds = new Set(soon.map((f) => f.id));
+    const expiringAi = soon.map(toAi);
+    // solo ideas for non-expiring foods: closest to expiry first, capped to keep the batch reasonable
+    const extrasAi = allFoods
+      .filter((f) => !soonIds.has(f.id))
+      .sort((a, b) => a.expDate.localeCompare(b.expDate))
+      .slice(0, 8)
+      .map(toAi);
+    const knownIds = new Set(allFoods.map((f) => f.id));
 
     let attemptError: string | null = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -452,10 +517,10 @@ async function generateAndSave(env: Env, scope: Scope, soon: FoodItem[], avoidTi
       let generator: string;
       try {
         if (env.GEMINI_API_KEY?.trim()) {
-          text = await generateWithGemini(env, buildPrompt(aiFoods, singleIds, attemptError, avoidTitles));
+          text = await generateWithGemini(env, buildPrompt(expiringAi, extrasAi, attemptError, avoidTitles));
           generator = `gemini:${MODEL(env)}`;
         } else {
-          text = generateWithMock(aiFoods);
+          text = generateWithMock(expiringAi, extrasAi);
           generator = "mock";
         }
       } catch (e) {
@@ -477,7 +542,8 @@ async function generateAndSave(env: Env, scope: Scope, soon: FoodItem[], avoidTi
       const doc: IdeasDoc = {
         generatedAt: new Date().toISOString(),
         generator,
-        foodSnapshot: soon.map((f) => f.id).sort(),
+        foodSnapshot: allFoods.map((f) => f.id).sort(),
+        expiringSnapshot: soon.map((f) => f.id).sort(),
         ideas: result.ideas,
       };
       await kvPut(env, kIdeas(scope), JSON.stringify(doc), scope.ttl);

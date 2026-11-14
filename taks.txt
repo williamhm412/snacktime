@@ -63,6 +63,22 @@ PHASE 4 — CLOUDFLARE + RENAME (2026-11-13)
       without it). Subtle name chip top-right → popover → "Switch person".
       Old shared 'foods' key migrated to foods:william (kept live items).
       COURTESY divider, not security — anyone can pick any name (fine for now).
+[x] T38 Ideas v3 (2026-11-14): THREE tabs — "Expiring" (default: 3 combined meals
+      around food ≤7 days out; "All clear" page when nothing expires),
+      "Use It All" (3 combined meals around the WHOLE pantry, any dates) and
+      "By Food" (2 solo ideas per food, any dates; "best by" label for far dates).
+      IdeasDoc gains idea.set (expiring|pantry) + expiringSnapshot; freshness
+      now watches the whole pantry (any add/delete regenerates). Verified live:
+      Gemini 16-idea batch in ~30s, forced rerun → 0 overlap, correct split.
+[~] T39 Reliability rework (same day): Gemini entered a multi-hour "hang"
+      period — deferred (waitUntil) generations froze mid-run and held the
+      lock. Generation is now CLIENT-DRIVEN & SYNCHRONOUS: /api/ideas/refresh
+      answers {view, startGeneration}; the client then fire-and-forgets
+      /api/ideas/generate and HOLDS that request open — the AI runs inside a
+      live request that can't be silently frozen. Poller re-refreshes so a dead
+      generation (tab closed) auto-restarts once the lock goes stale (>130s);
+      lock TTL cut 600s→180s. Verified: forced batch replaced mid-outage, 1 req.
+      NOTE: users must reload the app once (old cached JS ≠ new API shape).
 [ ] T15 Multiple users / accounts — PARTIALLY done via T37; real auth
       (magic links / Cloudflare Access) still open if ever needed
 [ ] T35 Optional: connect Pages to the GitHub repo for auto-deploy on push (1-click

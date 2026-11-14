@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchFoods, getIdeas, refreshIdeas } from "../api";
+import { fetchFoods, refreshIdeas } from "../api";
 import { daysUntil, formatExpDate } from "../dates";
 import type { FoodItem } from "../types";
 import type { IdeasView, Ingredient, RecipeIdea } from "../recipeTypes";
 
 type Unit = "volume" | "weight";
-type Mode = "all" | "byfood";
+type Mode = "expiring" | "all" | "byfood";
 
 /* ── small helpers ─────────────────────────────────────────────────────── */
 
@@ -144,9 +144,8 @@ function InfoSheet({ onClose }: { onClose: () => void }) {
         <div className="sheet-handle" />
         <h2>How Ideas works</h2>
         <ul>
-          <li><b>Ideas watches the next 7 days.</b> Any food expiring within a week (or already past) gets attention; anything further out doesn't appear here.</li>
-          <li><b>Ideas refresh automatically</b> the first time you open this tab each day, whenever a food enters that 7-day window, and whenever your list changes — like when you mark something used. So recipes always match what's actually in your kitchen.</li>
-          <li><b>“Use It All”</b> is 3 meals chosen to use up as much of your expiring food as possible, together. <b>“Ideas by Food”</b> gives each expiring food 2 quick solo ideas.</li>
+          <li><b>Three views of your food.</b> <b>“Expiring”</b> (default) plans meals around food within 7 days of expiring. <b>“Use It All”</b> plans meals around your WHOLE pantry, whatever the dates. <b>“Ideas by Food”</b> gives every food 2 quick solo ideas, regardless of expiry.</li>
+          <li><b>Ideas refresh automatically</b> the first time you open this tab each day and whenever your list changes — like when you add food or mark something used. So recipes always match what's actually in your kitchen.</li>
           <li><b>Tap ↻</b> for a brand-new batch — the AI is told the current ideas and won't repeat any of them.</li>
           <li><b>Pantry staples are assumed</b> — oil, salt, spices, rice, pasta, onions, garlic and the like. The ingredient list shows what you'd still need to buy.</li>
           <li><b>Units toggle:</b> flip between volume (cups/tsp) and weight (g/ml) inside any open recipe. Estimates are approximate — cook with your eyes and nose.</li>
@@ -163,7 +162,7 @@ function InfoSheet({ onClose }: { onClose: () => void }) {
 export default function IdeasScreen() {
   const [view, setView] = useState<IdeasView | null>(null);
   const [foods, setFoods] = useState<FoodItem[]>([]);
-  const [mode, setMode] = useState<Mode>("all");
+  const [mode, setMode] = useState<Mode>("expiring");
   const [openIdea, setOpenIdea] = useState<RecipeIdea | null>(null);
   const [openFoods, setOpenFoods] = useState<Set<string>>(new Set());
   const [unit, setUnit] = useState<Unit>("volume");
@@ -182,11 +181,11 @@ export default function IdeasScreen() {
     return () => { live = false; };
   }, [applyView]);
 
-  // poll while the AI is working
+  // poll while the AI is working (via refresh so a dropped generation auto-restarts)
   useEffect(() => {
     if (!view?.generating) return;
     pollRef.current = setInterval(() => {
-      getIdeas().then(applyView).catch(() => {});
+      refreshIdeas(false).then(applyView).catch(() => {});
     }, 2000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [view?.generating, applyView]);
@@ -215,10 +214,13 @@ export default function IdeasScreen() {
   const cache = view?.cache ?? null;
   const generating = view?.generating ?? false;
   const ideas = cache?.ideas ?? [];
-  const combined = ideas.filter((i) => i.scope === "combined");
+  // tolerate older cached docs that predate the "set" field
+  const setOf = (i: RecipeIdea) => i.set ?? "expiring";
+  const combinedExpiring = ideas.filter((i) => i.scope === "combined" && setOf(i) === "expiring");
+  const combinedPantry = ideas.filter((i) => i.scope === "combined" && setOf(i) === "pantry");
   const singles = ideas.filter((i) => i.scope === "single");
 
-  // group singles per tracked food, only for foods still on the list
+  // group singles per tracked food (both sets), only for foods still on the list
   const perFood = new Map<string, RecipeIdea[]>();
   for (const idea of singles) {
     const id = idea.usesFoodIds[0];
@@ -230,8 +232,12 @@ export default function IdeasScreen() {
   );
 
   const isMock = cache?.generator === "mock";
+  const pantryEmpty = foods.length === 0;
   const expiringCount = foods.filter((f) => daysUntil(f.expDate) <= 7).length;
-  const modeEmpty = mode === "all" ? combined.length === 0 : perFoodEntries.length === 0;
+  const modeIdeas =
+    mode === "expiring" ? combinedExpiring : mode === "all" ? combinedPantry : singles;
+  const modeEmpty =
+    mode === "byfood" ? perFoodEntries.length === 0 : modeIdeas.length === 0;
 
   return (
     <section>
@@ -247,13 +253,16 @@ export default function IdeasScreen() {
         </span>
       </div>
 
-      {/* the two view modes, like the list screen */}
+      {/* the three view modes, like the list screen */}
       <div className="segmented" role="tablist" aria-label="Ideas view">
+        <button className={mode === "expiring" ? "segmented-on" : ""} onClick={() => setMode("expiring")}>
+          Expiring
+        </button>
         <button className={mode === "all" ? "segmented-on" : ""} onClick={() => setMode("all")}>
           Use It All
         </button>
         <button className={mode === "byfood" ? "segmented-on" : ""} onClick={() => setMode("byfood")}>
-          Ideas by Food
+          By Food
         </button>
       </div>
 
@@ -273,37 +282,39 @@ export default function IdeasScreen() {
         </div>
       )}
 
-      {/* nothing expiring */}
-      {view && !generating && expiringCount === 0 && (
+      {/* nothing in the kitchen at all */}
+      {view && !generating && pantryEmpty && (
         <div className="empty">
-          <div className="empty-emoji">✨</div>
-          <p className="empty-title">All clear</p>
-          <p>Nothing expires in the next 7 days. Ideas will appear here when it does.</p>
+          <div className="empty-emoji">🧺</div>
+          <p className="empty-title">Your pantry is empty</p>
+          <p>Add some food (＋ tab) and the AI will plan meals around it — expiring or not.</p>
         </div>
       )}
 
-      {/* selected mode has no ideas yet (but the other might) */}
-      {view && !generating && expiringCount > 0 && !view.error && cache && modeEmpty && (
+      {/* "Expiring" tab, but nothing expires soon — other tabs still work */}
+      {view && !generating && !pantryEmpty && mode === "expiring" && expiringCount === 0 && (
         <div className="empty">
-          <div className="empty-emoji">🤔</div>
-          <p className="empty-title">No ideas here yet</p>
+          <div className="empty-emoji">✨</div>
+          <p className="empty-title">All clear</p>
           <p>
-            {mode === "all"
-              ? "No combined meals yet — try the other view or tap ↻."
-              : "No per-food ideas yet — try the other view or tap ↻."}
+            Nothing expires in the next 7 days, so there are no urgency ideas here.
+            Switch to <b>Use It All</b> or <b>By Food</b> anytime — those work whatever the dates.
           </p>
         </div>
       )}
 
+      {/* selected mode has no ideas yet (foods exist, generation done, no error) */}
+      {view && !generating && !pantryEmpty && !(mode === "expiring" && expiringCount === 0) && !view.error && cache && modeEmpty && (
+        <div className="empty">
+          <div className="empty-emoji">🤔</div>
+          <p className="empty-title">No ideas here yet</p>
+          <p>Try the other views, or tap ↻ for a fresh batch.</p>
+        </div>
+      )}
+
       {/* showing ideas while a newer set cooks up */}
-      {ideas.length > 0 && (
-        mode === "all" ? (
-          <ul className="card-list">
-            {combined.map((idea) => (
-              <IdeaCard key={idea.title} idea={idea} onOpen={() => setOpenIdea(idea)} foodName={foodName} />
-            ))}
-          </ul>
-        ) : (
+      {ideas.length > 0 && !pantryEmpty && !(mode === "expiring" && expiringCount === 0) && (
+        mode === "byfood" ? (
           perFoodEntries.map(([id, list]) => {
             const f = foodById.get(id)!;
             const d = daysUntil(f.expDate);
@@ -313,7 +324,7 @@ export default function IdeasScreen() {
                 <button className={`food-group-head ${open ? "food-group-head-open" : ""}`} onClick={() => toggleFood(id)} aria-expanded={open}>
                   <span className="food-group-name">{f.name}</span>
                   <span className={`food-group-date ${d < 0 ? "group-title-red" : ""}`}>
-                    {d < 0 ? `expired ${formatExpDate(f.expDate)}` : `expires ${formatExpDate(f.expDate)}`}
+                    {d < 0 ? `expired ${formatExpDate(f.expDate)}` : d > 7 ? `best by ${formatExpDate(f.expDate)}` : `expires ${formatExpDate(f.expDate)}`}
                   </span>
                   <span className={`chevron ${open ? "chevron-down" : ""}`} aria-hidden>
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -331,11 +342,17 @@ export default function IdeasScreen() {
               </div>
             );
           })
+        ) : (
+          <ul className="card-list">
+            {modeIdeas.map((idea) => (
+              <IdeaCard key={idea.title} idea={idea} onOpen={() => setOpenIdea(idea)} foodName={foodName} />
+            ))}
+          </ul>
         )
       )}
 
-      {/* stale/empty but items exist and generation never ran (e.g. after an error) */}
-      {view && !generating && ideas.length === 0 && expiringCount > 0 && !view.error && !cache && (
+      {/* foods exist but generation never produced a cache (e.g. after an error) */}
+      {view && !generating && pantryEmpty === false && ideas.length === 0 && !view.error && !cache && (
         <div className="empty">
           <p className="empty-title">No ideas yet</p>
           <p>Tap ↻ to try generating again.</p>

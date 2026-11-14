@@ -34,9 +34,10 @@ Notes:
 - AI responses must match a strict recipe JSON schema (prep/cook time, servings,
   ingredients with BOTH volume + weight measures, instructions, comments); invalid
   output is retried once, then rejected with a friendly error.
-- Ideas regenerate automatically: first Ideas-tab open each day, when food enters
-  the 7-day window, and when your list changes. Manual ↻ additionally forbids the
-  AI from reusing the current ideas.
+- AI ideas: three tabs — **Expiring** (default; meals around food ≤7 days out),
+  **Use It All** (meals around the whole pantry, any dates), **By Food** (2 solo
+  ideas per food). Generation is client-driven: the app opens
+  `/api/ideas/generate` and keeps it live while the AI works inside the request.
 - Weekly email is a dev stub (digest saved to KV `outbox:latest`). Pages has no
   cron — wire real email + a scheduler in T12 (options: external cron hitting
   `/api/email/send-now`, or move to a full Worker with Cron Triggers).
@@ -76,7 +77,8 @@ Then push code too: `git add -A && git commit && git push`.
 - `POST /api/foods` — `{ "name": "...", "expDate": "YYYY-MM-DD" }`
 - `DELETE /api/foods/:id`
 - `GET /api/ideas` — cached ideas + generating status
-- `POST /api/ideas/refresh` — regenerate if stale; `{ "force": true }` = new batch, no repeats
+- `POST /api/ideas/refresh` — `{view, startGeneration}`; regenerate if stale; `{ "force": true }` = new batch, no repeats
+- `POST /api/ideas/generate` — SYNCHRONOUS generation (client holds the request open; runs while live)
 - `POST /api/email/send-now` — build weekly digest (dev stub → KV outbox)
 - `GET /api/health`
 
