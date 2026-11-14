@@ -1,0 +1,19 @@
+Ok here's the general plan / outline:
+>> an app whos goal is to reduce food waste
+>> the user will input their food and experiation date when they buy food
+>> the app tracks that all
+>> there should be a tab on the nav that is for enter food and when clicked it just takes to a simple page where the user inputs "food" and "exp date"
+>> there should be another page that is a list of all the food entered. it should be able to list in order of either 1. order added or 2. closest to expire
+>> there should be an easy way to click or something to remove the food from the list when it is used
+>> there should be another tab that is called inspo or something and it will look at the things closest to expiring and it will use AI (the API can be integrated late into the development) to come up with recipe ideas that are based on or use mostly the ingredients close to expiring
+>> the app should also send email notifications every week that sends a list of all food that expires in the next week
+
+Development:
+>> for now we can just do something that runs on this computer locally hosted. No need to deploy yet to any app store
+>> I want a front end and back end
+>> the back end needs to save the data, etc. for now can we keep the back end on this computer locally saved in the file system here in a section that get's updated as the app is used? is that possible?
+>> do we want to do this in JS or typescript? Vite? idk, what do you suggest?
+
+Design:
+>> I want it to be simple but fairly elegant. I like the style / design of the venmo phone app with just a lower nav bar and only a few screens.
+>> keep the colors to just a few colors in the scheme, but make it fun (elegant tho)

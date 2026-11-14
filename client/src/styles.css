@@ -1,0 +1,826 @@
+/* ── SnackTime — simple, elegant, Venmo-inspired ─────────────────────────
+   Palette (4 colors): off-white bg · white cards · charcoal ink · fresh green
+   Semantic tints (red/amber) only for expiry badges.                      */
+
+:root {
+  --bg: #f7f7f4;
+  --card: #ffffff;
+  --ink: #1c1e21;
+  --green: #1fa463;
+  --green-dark: #178a53;
+  --green-soft: #e3f4ea;
+  --muted: #7c828b;
+  --line: #e9e9e4;
+  --red: #d64545;
+  --red-soft: #fbe9e9;
+  --amber: #a86a0b;
+  --amber-soft: #faf0da;
+  --radius: 16px;
+  --shadow: 0 1px 3px rgba(28, 30, 33, 0.06), 0 6px 16px rgba(28, 30, 33, 0.05);
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Phone-width column, centered on the page */
+.app {
+  max-width: 440px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(247, 247, 244, 0.92);
+  backdrop-filter: blur(8px);
+  padding: 14px 20px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--green);
+  text-transform: uppercase;
+}
+
+.brand-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.page-title {
+  margin: 2px 0 0;
+  font-size: 27px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+/* ── Content ─────────────────────────────────────────────────────────── */
+.content {
+  flex: 1;
+  padding: 8px 20px 24px;
+}
+
+/* ── Bottom tab bar ──────────────────────────────────────────────────── */
+.tabbar {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 0 6px;
+  border: none;
+  background: none;
+  border-radius: 12px;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab-active {
+  color: var(--green);
+}
+
+/* ── Segmented sort control ──────────────────────────────────────────── */
+.segmented {
+  display: flex;
+  background: #ececea;
+  border-radius: 12px;
+  padding: 3px;
+  margin: 4px 0 16px;
+}
+
+.segmented button {
+  flex: 1;
+  border: none;
+  background: none;
+  padding: 8px 0;
+  border-radius: 9px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.segmented-on {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(28, 30, 33, 0.1);
+}
+
+/* added-time chip in the list (only in "Recently added" mode) */
+.food-added {
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+/* ── Ideas: toolbar, expandable recipes, info sheet ───────────────────── */
+.ideas-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 2px 0 10px;
+  min-height: 30px;
+}
+
+.ideas-updated {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.ideas-tools {
+  display: flex;
+  gap: 6px;
+}
+
+.icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.icon-btn:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.generating-pill {
+  display: inline-block;
+  background: var(--green-soft);
+  color: var(--green-dark);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.notice-mock {
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-weight: 500;
+  font-size: 12.5px;
+}
+
+.notice-mock code {
+  background: rgba(168, 106, 11, 0.12);
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 11.5px;
+}
+
+.spinner {
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 14px;
+  border: 3.5px solid var(--green-soft);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.group-title-green {
+  color: var(--green-dark);
+}
+
+.group-sub {
+  margin: -4px 4px 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.food-group-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 16px 4px 8px;
+}
+
+/* tappable idea cards (tap opens the full-screen recipe) */
+.idea-tappable {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+}
+
+/* collapsible per-food groups (Ideas by Food mode) */
+.food-group {
+  margin: 0 0 18px;
+}
+
+.food-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  font-family: var(--font);
+  padding: 12px 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.food-group-head:hover {
+  background: #fbfbf8;
+  transform: translateY(-1px);
+}
+
+/* stays softly highlighted while the section is open */
+.food-group-head-open,
+.food-group-head-open:hover {
+  background: var(--green-soft);
+}
+
+.food-group-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.food-group-date {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.food-group-head .chevron {
+  transform: rotate(-90deg);
+}
+
+.food-group-head .chevron-down {
+  transform: rotate(0deg);
+}
+
+.food-group-body {
+  padding: 14px 0 2px 10px;
+}
+
+.idea-tappable:hover {
+  transform: translateY(-1px);
+}
+
+.idea-tappable:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.idea-why {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.idea-uses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.chip {
+  display: inline-block;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.chip-mine {
+  background: var(--green-soft);
+  border-color: transparent;
+  color: var(--green-dark);
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 0.18s ease;
+  margin-top: 2px;
+}
+
+.chevron-up {
+  transform: rotate(180deg);
+}
+
+/* volume ⇄ weight toggle (shown in the full-screen recipe header, top-right) */
+.unit-toggle {
+  display: inline-flex;
+  background: #ececea;
+  border-radius: 999px;
+  padding: 2.5px;
+}
+
+.unit-toggle button {
+  border: none;
+  background: none;
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.unit-on {
+  background: var(--card);
+  color: var(--green-dark);
+  box-shadow: 0 1px 3px rgba(28, 30, 33, 0.12);
+}
+
+/* full-screen recipe view */
+.recipe-full {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--bg);
+  max-width: 440px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  animation: slide-in 0.18s ease;
+}
+
+@keyframes slide-in {
+  from { transform: translateX(24px); opacity: 0.6; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.rf-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(247, 247, 244, 0.94);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+
+.rf-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: none;
+  background: none;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--green-dark);
+  padding: 6px 8px 6px 2px;
+  margin-left: -8px;
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+.rf-back:hover {
+  background: var(--green-soft);
+}
+
+.rf-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px calc(30px + env(safe-area-inset-bottom));
+}
+
+.rf-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+  margin: 0 0 6px;
+}
+
+.rf-why {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.rf-section {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  margin: 22px 0 8px;
+}
+
+.recipe-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.recipe-meta em {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.ing-list,
+.step-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.ing-list {
+  list-style: none;
+  padding-left: 2px;
+}
+
+.ing-qty {
+  font-weight: 700;
+  color: var(--green-dark);
+}
+
+.recipe-comment {
+  margin: 20px 0 0;
+  background: var(--green-soft);
+  color: var(--green-dark);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 10px 12px;
+  border-radius: 10px;
+  line-height: 1.4;
+}
+
+/* info sheet */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 30, 33, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.sheet {
+  width: 100%;
+  max-width: 440px;
+  background: var(--card);
+  border-radius: 22px 22px 0 0;
+  padding: 10px 22px calc(20px + env(safe-area-inset-bottom));
+  max-height: 82dvh;
+  overflow-y: auto;
+  animation: rise 0.22s ease;
+}
+
+@keyframes rise {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+  margin: 4px auto 10px;
+}
+
+.sheet h2 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  margin: 0 0 12px;
+}
+
+.sheet ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.sheet li b {
+  font-weight: 700;
+}
+
+.sheet-close {
+  margin-top: 18px;
+  width: 100%;
+}
+
+/* ── Food cards ──────────────────────────────────────────────────────── */
+.card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.food-card,
+.idea-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+.food-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.food-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  overflow-wrap: anywhere;
+}
+
+.food-date {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.food-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ── Expiry badges ───────────────────────────────────────────────────── */
+.badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badge-soon,
+.badge-expired {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.badge-mid {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.badge-fresh {
+  background: var(--green-soft);
+  color: var(--green-dark);
+}
+
+/* ── "Used" check button ─────────────────────────────────────────────── */
+.used-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.used-btn:hover {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+/* ── Add screen ──────────────────────────────────────────────────────── */
+.add-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  margin-top: 6px;
+}
+
+.field-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  margin: 14px 0 6px;
+}
+
+.field-label:first-child {
+  margin-top: 0;
+}
+
+.field {
+  font-family: var(--font);
+  font-size: 16px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.field:focus {
+  border-color: var(--green);
+  background: var(--card);
+}
+
+.primary-btn {
+  margin-top: 22px;
+  border: none;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  padding: 14px 0;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.primary-btn:hover:not(:disabled) {
+  background: var(--green-dark);
+}
+
+.primary-btn:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.primary-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.hint {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ── Ideas screen ────────────────────────────────────────────────────── */
+.group-title {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  margin: 20px 4px 10px;
+}
+
+.group-title:first-child {
+  margin-top: 6px;
+}
+
+.group-title-red {
+  color: var(--red);
+}
+
+.ai-placeholder {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ── Notices & empty states ──────────────────────────────────────────── */
+.notice {
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin: 8px 0;
+}
+
+.notice-error {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 60px 16px;
+  font-size: 14px;
+}
+
+.empty-emoji {
+  font-size: 42px;
+  margin-bottom: 10px;
+}
+
+.empty-title {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}

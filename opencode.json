@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "myapi": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "BYU A6000",
+      "options": {
+        "baseURL": "https://cb317-ai-public.et.byu.edu/v1",
+        "apiKey": "sk-saB_E_nipatTbRZv50fKnw"
+      },
+      "models": {
+        "cosmo-omni": {
+          "name": "BYU PRISM"
+        }
+      }
+    }
+  }
+}

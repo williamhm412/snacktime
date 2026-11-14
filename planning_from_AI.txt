@@ -1,0 +1,72 @@
+EXECUTIVE SUMMARY
+=================
+"SnackTime" — an app to reduce food waste. Built in TypeScript end-to-end.
+
+Structure:
+  - Two parts in one project (npm workspaces):
+      server/  → Node + Express API. Saves all food items in a plain JSON
+                 file: server/data/foods.json (you can open it anytime and
+                 watch it update as you use the app).
+      client/  → React + Vite front end. Phone-style layout with a bottom
+                 nav bar and 3 tabs: List, Add, Ideas.
+  - Everything runs locally on this computer. Start both parts with:
+        npm run dev
+    Then open http://localhost:5173 in a browser (use phone-width window for
+    the app feel).
+
+Key decisions:
+  - Data lives in the file system (server/data/foods.json) — no database to
+    install; easy to switch to SQLite/Postgres later if ever needed.
+  - Weekly email is a "dev stub" for now: instead of really sending email,
+    the app writes the weekly digest into server/data/outbox/ as a file you
+    can open and preview. Switching to real email later = one small change
+    (SMTP credentials + nodemailer send).
+  - "Ideas" tab lists items closest to expiring with [ AI recipe ideas
+    coming soon ] placeholders. AI API gets wired in later — the server
+    already has a placeholder endpoint ready for it.
+  - Design: Venmo-inspired — off-white background, one fresh green accent,
+    charcoal text, rounded cards, bottom tab bar. ~4 colors total.
+
+Future plans (not built yet):
+  - Integrate an AI API for recipe ideas — BUILT 2026-11-13 (Gemini free tier +
+    mock fallback, strict recipe JSON schema, auto-refresh triggers, expanding
+    recipe cards, unit toggle, ⓘ explainer). Only remaining step: paste a free
+    GEMINI_API_KEY into server/.env (see README).
+  - Real email sending (Gmail app password or a free API like Brevo).
+  - Optional: multiple users/accounts, editing items, deploy to the internet.
+
+
+BUILD ORDER (what I'm doing, in order)
+======================================
+1. Set up project: root workspace + server/ + client/ folders, all
+   TypeScript, one command to run everything ("npm run dev").
+
+2. Backend:
+   - Express server on port 3001 with 3 endpoints:
+       GET    /api/foods?sort=added|expiry   → list all foods
+       POST   /api/foods                     → add { name, expDate }
+       DELETE /api/foods/:id                 → remove (mark as used)
+   - Persistence: read/write server/data/foods.json on every change.
+   - Weekly email job: node-cron runs every Sunday 9am, collects foods
+     expiring in the next 7 days, writes the digest to
+     server/data/outbox/. Also POST /api/email/send-now to test on demand.
+
+3. Frontend scaffold: React + Vite, dev proxy so /api calls reach the
+   server. Bottom nav bar with 3 tabs, centered phone-width layout.
+
+4. Screens:
+   - Add: simple form (food name + expiration date), one button, then it
+     jumps back to the list.
+   - List: cards for each food, colored expiry badge (red ≤3 days,
+     amber ≤7 days, green further out), sort toggle (recently added vs
+     expiring soon), and a "Used" button to remove an item.
+   - Ideas: shows items expiring soonest, grouped, each with
+     [ AI recipe ideas coming soon ] placeholder text.
+
+5. Styling pass: green/white/charcoal palette, rounded cards, soft shadows,
+   clean spacing — simple but elegant.
+
+6. Test: run both servers, exercise add/list/remove/sort via API and UI,
+   trigger a test email digest and check the outbox file.
+
+7. Update taks.txt with completion status; leave notes for next steps.

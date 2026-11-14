@@ -1,0 +1,70 @@
+TASKS — SnackTime (update this file as work progresses)
+Format: [ ] todo  [x] done  [-] dropped  [~] in progress / changed
+
+PHASE 1 — FOUNDATION
+[x] T1  Set up project skeleton: npm workspaces, server/ + client/, TypeScript configs
+[x] T2  Backend: Express API (GET/POST/DELETE /api/foods) + JSON file persistence
+[x] T3  Backend: weekly email digest job (cron) + dev stub writing to data/outbox/
+[x] T4  Backend: test endpoint POST /api/email/send-now to trigger digest on demand
+[x] T5  Frontend scaffold: Vite + React, API proxy, bottom nav with 3 tabs
+[x] T6  Screen: Add food (name + exp date form)
+[x] T7  Screen: Food list with expiry badges, sort toggle (added / expiring soon), "Used" remove button
+[x] T8  Screen: Ideas — soon-to-expire items with [ AI recipe ideas coming soon ] placeholders
+[x] T9  Styling: Venmo-inspired, green accent, off-white bg, rounded cards, bottom nav
+[x] T10 Test end-to-end (add/remove/sort, email outbox) and fix issues
+
+PHASE 2 — FUTURE (ideas backlog, not started)
+[~] T11 Integrate AI API for recipe ideas on Ideas tab — DONE via T17–T23 (key added)
+[ ] T12 Real email sending via SMTP/nodemailer or a transactional email API
+[x] T17 Recipe format: strict JSON schema (title, why, servings, prep/cook minutes,
+      ingredients w/ BOTH volume+weight measures, instructions, comments) — validated
+      server-side, AI must match or it gets one retry with the error message
+[x] T18 AI provider module: Gemini (free tier, structured output via responseSchema)
+      + built-in mock generator when no key is set (server/src/ai.ts, recipes.ts)
+[x] T19 Generation triggers: ① first Ideas-tab open each day ② item enters 7-day
+      window ③ expiring list changes (marked used) — debounced + single-flight,
+      cache in server/data/ideas.json, manual ↻ refresh button
+[x] T20 Ideas tab v2: "This Week's Plan" (3 combined ideas) + "Quick Ideas by Food"
+      (2 per expiring food), tap card to expand full recipe, volume⇄weight toggle
+      (volume default), green "your <food>" chips on tracked ingredients
+[x] T21 ⓘ info sheet explaining Ideas in plain user language (7-day window, refresh
+      timing, pantry assumptions, unit toggle, AI-disclaimer)
+[x] T22 Tested end-to-end with mock generator: triggers fire, freshness keeps cache,
+      force refresh regenerates, used-item ideas auto-removed
+      (two bugs found & fixed: empty-pantry ideas weren't cleared; a change that
+      arrived mid-generation could be dropped instead of queued — now reruns)
+[x] T23 With live Gemini key: verify real AI responses match schema + tune prompt
+      if needed (server logs show validation results)
+      DONE: 9/9 real recipes passed validation first try. Notes from the field:
+      · gemini-2.0-flash is retired; gemini-3.8-flash is heavily overloaded (hangs)
+      · default is now gemini-3.5-flash (override in server/.env GEMINI_MODEL)
+      · free tier throws intermittent 503 "high demand" — generation auto-retries once
+      and shows a friendly error + ↻ if both attempts fail; a later retry succeeds
+      · added 70s hard timeout so a slow API can never wedge generation
+[ ] T13 Edit an existing food item (name/date)
+
+PHASE 3 — UI REFINEMENTS (requested 2026-11-13, built same day)
+[x] T24 List: small "added 2h ago"-style chip, only when "Recently added" sort is active
+[x] T25 ↻ manual refresh: prompt now lists the current ideas and forbids the AI from
+      reusing any of them (verified: 9 new titles, zero overlap). Auto-refreshes
+      (new day / list change) do NOT carry the ban, so a good idea may return then.
+[x] T26 Unit toggle moved: only exists inside an open recipe, top-right corner
+[x] T27 Recipe tap = full-screen view (own scroll, ‹ Back to return), replacing the
+      old inline expand
+[x] T28 Ideas tab gets two modes like the list: "Use It All" (combined) and
+      "Ideas by Food" — each food an expand/collapse section w/ its 2 recipes,
+      all starting collapsed
+[ ] T14 Empty states + nicer animations (item removed, added)
+[ ] T15 Multiple users / accounts (only if ever deployed)
+[ ] T16 Deploy (optional, later): render/railway or VPS
+
+IDEA LOG (new ideas get noted here with dates)
+- 2026-11-13: initial plan from planning.txt captured as T1–T10; future ideas as T11–T16.
+- 2026-11-13: T1–T10 BUILT AND TESTED. Verified: add/list/delete + sorting via API,
+  foods.json persists on disk, weekly email stub writes digests to data/outbox/,
+  frontend builds clean and Vite proxy reaches the API. Start with: npm run dev
+  (open http://localhost:5173). Next up when ready: T11 (AI ideas) / T12 (real email).
+- 2026-11-13: AI integration (T17–T22) built & tested with mock generator. KEY ADDED —
+  live Gemini verified (T23): real recipes generate cleanly with gemini-3.5-flash.
+  If Google's free tier is congested you'll see a retriable error; hit ↻ later.
+

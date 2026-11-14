@@ -1,0 +1,18 @@
+{
+  "name": "snacktime",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SnackTime — reduce food waste. Locally hosted React + Express app.",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c green,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
+    "start": "npm run start -w server & npm run preview -w client",
+    "build": "npm run build -w client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
