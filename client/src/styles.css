@@ -124,6 +124,7 @@ body {
 
 .tab-active {
   color: var(--green);
+  background: var(--green-soft);
 }
 
 /* ── Segmented sort control ──────────────────────────────────────────── */

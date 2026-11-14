@@ -7,6 +7,16 @@ export type Tab = "list" | "add" | "ideas";
 
 const TABS: { id: Tab; label: string; icon: JSX.Element }[] = [
   {
+    id: "ideas",
+    label: "Ideas",
+    icon: (
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.8l.1.8h4.8l.1-.8c.1-.7.4-1.3 1-1.8A6 6 0 0 0 12 3Z" />
+        <path d="M10 19.5h4M10.5 21.5h3" />
+      </svg>
+    ),
+  },
+  {
     id: "list",
     label: "List",
     icon: (
@@ -25,16 +35,6 @@ const TABS: { id: Tab; label: string; icon: JSX.Element }[] = [
       </svg>
     ),
   },
-  {
-    id: "ideas",
-    label: "Ideas",
-    icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5.9 1.1 1 1.8l.1.8h4.8l.1-.8c.1-.7.4-1.3 1-1.8A6 6 0 0 0 12 3Z" />
-        <path d="M10 19.5h4M10.5 21.5h3" />
-      </svg>
-    ),
-  },
 ];
 
 const TITLES: Record<Tab, string> = {
@@ -45,7 +45,6 @@ const TITLES: Record<Tab, string> = {
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("list");
-
   return (
     <div className="app">
       <header className="topbar">
