@@ -54,7 +54,17 @@ PHASE 4 — CLOUDFLARE + RENAME (2026-11-13)
       service hitting /api/email/send-now, or move app to a Worker w/ Cron Triggers
 [ ] T13 Edit an existing food item (name/date)
 [ ] T14 Empty states + nicer animations (item removed, added)
-[ ] T15 Multiple users / accounts (needs auth — Cloudflare Access or similar)
+[x] T37 Temporary multi-user split (2026-11-14): "Who are you?" gate on first open
+      (searchable picker: William · Ammon · McKay · Dr. Lignell · Guest).
+      Named = pantry saved in cloud under per-user KV keys (foods:<user>,
+      ideas:<user>…), same data on any device; choice remembered per browser.
+      Guest = random id in sessionStorage + 12h KV TTL → blank on reopen,
+      cloud copy self-destructs. Identity via X-Snacktime-User header (401
+      without it). Subtle name chip top-right → popover → "Switch person".
+      Old shared 'foods' key migrated to foods:william (kept live items).
+      COURTESY divider, not security — anyone can pick any name (fine for now).
+[ ] T15 Multiple users / accounts — PARTIALLY done via T37; real auth
+      (magic links / Cloudflare Access) still open if ever needed
 [ ] T35 Optional: connect Pages to the GitHub repo for auto-deploy on push (1-click
       in Cloudflare dashboard → Pages → snacktime → Build settings)
 [ ] T36 Optional: custom domain (e.g. snacktime.yourdomain.com)

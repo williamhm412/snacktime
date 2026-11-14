@@ -14,11 +14,21 @@ Reduce food waste: log food + expiration dates, see what's expiring soon, and ge
 | Frontend | React + Vite (TypeScript) | `client/` → built to `client/dist` |
 | Backend API | Cloudflare Pages Functions | `functions/api/[[path]].ts` |
 | Shared logic (store, AI, validation) | TypeScript | `shared/api-core.ts` |
-| Database | Cloudflare Workers KV (`SNACKTIME_DB`) | keys: `foods`, `ideas`, outbox, lock |
+| Database | Cloudflare Workers KV (`SNACKTIME_DB`) | per-user keys: `foods:<user>`, `ideas:<user>`, lock, outbox |
 | AI recipes | Gemini free tier (`gemini-3.5-flash`) | key stored as Pages **secret** `GEMINI_API_KEY` |
 | Hosting | Cloudflare Pages | project `snacktime` → snacktime.pages.dev |
 
 Config lives in `wrangler.toml` (KV namespace id + output dir).
+
+### Users (temporary identity, T37)
+
+The app asks "Who are you?" on first open (searchable: William, Ammon, McKay,
+Dr. Lignell, Guest). The choice rides on every request as the `X-Snacktime-User`
+header; all data routes 401 without a valid one. Named users get permanent
+per-user KV keys (same pantry on every device). Guest gets a random id kept in
+`sessionStorage` + KV entries with a 12 h TTL — closing the page = fresh blank
+session. Switch person via the name chip (top-right). This is a courtesy
+divider, not authentication — real auth would be T15.
 
 Notes:
 - AI responses must match a strict recipe JSON schema (prep/cook time, servings,
@@ -52,6 +62,13 @@ npm run deploy     # build client + wrangler pages deploy client/dist
 
 Then push code too: `git add -A && git commit && git push`.
 (Prod secret management: `npx wrangler pages secret put GEMINI_API_KEY --project-name=snacktime`)
+
+## Notes for the week
+
+- 2026-11-14: T37 identity gate (per-user cloud pantries + ephemeral guest).
+  Verified in prod: isolation (401 w/o header), migration, guest blank/TTL,
+  ideas generation per user. Gemini had a transient overload episode (~4 min
+  hang → zombie lock, self-heals via 600s TTL); rerun generated 11 ideas in 30s.
 
 ## API
 

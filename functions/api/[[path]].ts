@@ -8,6 +8,7 @@ import {
   ensureFreshIdeas,
   getIdeasView,
   listFoods,
+  parseUser,
   sendWeeklyDigest,
   type Env,
   type SortMode,
@@ -28,15 +29,26 @@ function json(data: unknown, status = 200): Response {
 }
 
 export const onRequest: PagesFunction<Env> = async (ctx) => {
-  const { request, env, next } = ctx;
+  const { request, env } = ctx;
   const path = new URL(request.url).pathname;
   const method = request.method;
 
   try {
+    /* ── misc (no identity needed) ──────────────────────────────────── */
+    if (path === "/api/health") {
+      return json({ ok: true, service: "snacktime", ts: Date.now() });
+    }
+
+    /* every data route below is scoped to the person chosen in the app */
+    const scope = parseUser(request.headers.get("X-Snacktime-User"));
+    if (!scope) {
+      return json({ error: "who are you? choose a profile first" }, 401);
+    }
+
     /* ── /api/foods ─────────────────────────────────────────────────── */
     if (path === "/api/foods" && method === "GET") {
       const sort: SortMode = new URL(request.url).searchParams.get("sort") === "expiry" ? "expiry" : "added";
-      return json(await listFoods(env, sort));
+      return json(await listFoods(env, scope, sort));
     }
 
     if (path === "/api/foods" && method === "POST") {
@@ -48,42 +60,37 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
       if (!isValidDate(expDate)) {
         return json({ error: "expDate must be a valid date (YYYY-MM-DD)" }, 400);
       }
-      const item = await addFood(env, name, expDate);
+      const item = await addFood(env, scope, name, expDate);
       // keep ideas in sync without delaying the response (client also re-syncs)
       if (daysUntil(item.expDate) <= 7) {
-        ctx.waitUntil(ensureFreshIdeas(env, ctx.waitUntil));
+        ctx.waitUntil(ensureFreshIdeas(env, scope, ctx.waitUntil));
       }
       return json(item, 201);
     }
 
     const foodMatch = path.match(/^\/api\/foods\/([\w-]+)$/);
     if (foodMatch && method === "DELETE") {
-      const removed = await deleteFood(env, foodMatch[1]);
+      const removed = await deleteFood(env, scope, foodMatch[1]);
       if (!removed) return json({ error: "food item not found" }, 404);
       if (daysUntil(removed.expDate) <= 7) {
-        ctx.waitUntil(ensureFreshIdeas(env, ctx.waitUntil));
+        ctx.waitUntil(ensureFreshIdeas(env, scope, ctx.waitUntil));
       }
       return new Response(null, { status: 204 });
     }
 
     /* ── /api/ideas ─────────────────────────────────────────────────── */
     if (path === "/api/ideas" && method === "GET") {
-      return json(await getIdeasView(env));
+      return json(await getIdeasView(env, scope));
     }
 
     if (path === "/api/ideas/refresh" && method === "POST") {
       const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-      return json(await ensureFreshIdeas(env, ctx.waitUntil, body?.force === true));
+      return json(await ensureFreshIdeas(env, scope, ctx.waitUntil, body?.force === true));
     }
 
     /* ── /api/email (dev stub) ──────────────────────────────────────── */
     if (path === "/api/email/send-now" && method === "POST") {
-      return json({ ok: true, ...(await sendWeeklyDigest(env)) });
-    }
-
-    /* ── misc ───────────────────────────────────────────────────────── */
-    if (path === "/api/health") {
-      return json({ ok: true, service: "snacktime", ts: Date.now() });
+      return json({ ok: true, ...(await sendWeeklyDigest(env, scope)) });
     }
 
     return json({ error: "not found" }, 404);

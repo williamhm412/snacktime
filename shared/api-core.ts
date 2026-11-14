@@ -54,13 +54,35 @@ export interface IdeasView {
   error: string | null;
 }
 
-/* ── KV helpers ────────────────────────────────────────────────────────── */
+/* ── User scope (temporary multi-user: one set of KV keys per person) ─── */
+/* Named users persist on any device. Guest = throwaway id held only in the
+   browser's sessionStorage + KV entries with a TTL, so closing the page or
+   waiting 12h wipes everything. NOTE: courtesy divider, not security. */
 
-const K_FOODS = "foods";
-const K_IDEAS = "ideas";
-const K_IDEAS_LOCK = "ideas:status"; // exists while a generation is running (TTL guards zombies)
-const K_IDEAS_ERROR = "ideas:error";
-const K_OUTBOX_LATEST = "outbox:latest";
+export const NAMED_USERS = ["william", "ammon", "mckay", "dr-lignell"] as const;
+export const GUEST_TTL_SECONDS = 12 * 3600;
+
+export interface Scope {
+  user: string; // "william" | ... | "guest:<random id>"
+  ttl?: number; // guests only: KV entries auto-expire
+}
+
+/** Turn the X-Snacktime-User header into a Scope, or null if not recognized. */
+export function parseUser(raw: string | null): Scope | null {
+  if (!raw) return null;
+  const v = raw.trim().toLowerCase();
+  if ((NAMED_USERS as readonly string[]).includes(v)) return { user: v };
+  if (/^guest:[a-z0-9-]{6,40}$/.test(v)) return { user: v, ttl: GUEST_TTL_SECONDS };
+  return null;
+}
+
+/* ── KV helpers (all keys are scoped per user) ─────────────────────────── */
+
+const kFoods = (s: Scope) => `foods:${s.user}`;
+const kIdeas = (s: Scope) => `ideas:${s.user}`;
+const kIdeasLock = (s: Scope) => `ideas:status:${s.user}`; // exists while a generation is running (TTL guards zombies)
+const kIdeasError = (s: Scope) => `ideas:error:${s.user}`;
+const kOutbox = (s: Scope) => `outbox:latest:${s.user}`;
 
 async function readJson<T>(env: Env, key: string, fallback: T): Promise<T> {
   const raw = await env.SNACKTIME_DB.get(key);
@@ -72,6 +94,10 @@ async function readJson<T>(env: Env, key: string, fallback: T): Promise<T> {
   }
 }
 
+async function kvPut(env: Env, key: string, value: string, ttl?: number): Promise<void> {
+  await env.SNACKTIME_DB.put(key, value, ttl ? { expirationTtl: ttl } : undefined);
+}
+
 /* ── Foods ─────────────────────────────────────────────────────────────── */
 
 export function daysUntil(expDate: string, now = new Date()): number {
@@ -80,8 +106,8 @@ export function daysUntil(expDate: string, now = new Date()): number {
   return Math.round((new Date(y, m - 1, d).getTime() - today.getTime()) / 86_400_000);
 }
 
-export async function listFoods(env: Env, sort: SortMode): Promise<FoodItem[]> {
-  const foods = await readJson<FoodItem[]>(env, K_FOODS, []);
+export async function listFoods(env: Env, scope: Scope, sort: SortMode): Promise<FoodItem[]> {
+  const foods = await readJson<FoodItem[]>(env, kFoods(scope), []);
   if (sort === "expiry") {
     foods.sort((a, b) => a.expDate.localeCompare(b.expDate) || b.addedAt.localeCompare(a.addedAt));
   } else {
@@ -90,20 +116,20 @@ export async function listFoods(env: Env, sort: SortMode): Promise<FoodItem[]> {
   return foods;
 }
 
-export async function addFood(env: Env, name: string, expDate: string): Promise<FoodItem> {
-  const foods = await readJson<FoodItem[]>(env, K_FOODS, []);
+export async function addFood(env: Env, scope: Scope, name: string, expDate: string): Promise<FoodItem> {
+  const foods = await readJson<FoodItem[]>(env, kFoods(scope), []);
   const item: FoodItem = { id: crypto.randomUUID(), name: name.trim(), expDate, addedAt: new Date().toISOString() };
   foods.push(item);
-  await env.SNACKTIME_DB.put(K_FOODS, JSON.stringify(foods));
+  await kvPut(env, kFoods(scope), JSON.stringify(foods), scope.ttl);
   return item;
 }
 
-export async function deleteFood(env: Env, id: string): Promise<FoodItem | null> {
-  const foods = await readJson<FoodItem[]>(env, K_FOODS, []);
+export async function deleteFood(env: Env, scope: Scope, id: string): Promise<FoodItem | null> {
+  const foods = await readJson<FoodItem[]>(env, kFoods(scope), []);
   const found = foods.find((f) => f.id === id) ?? null;
   const remaining = foods.filter((f) => f.id !== id);
   if (!found) return null;
-  await env.SNACKTIME_DB.put(K_FOODS, JSON.stringify(remaining));
+  await kvPut(env, kFoods(scope), JSON.stringify(remaining), scope.ttl);
   return found;
 }
 
@@ -368,11 +394,11 @@ function generateWithMock(foods: AiFood[]): string {
 
 /* ── Ideas orchestration (stateless: KV lock = single-flight) ─────────── */
 
-export async function getIdeasView(env: Env): Promise<IdeasView> {
+export async function getIdeasView(env: Env, scope: Scope): Promise<IdeasView> {
   const [cache, lock, error] = await Promise.all([
-    readJson<IdeasDoc | null>(env, K_IDEAS, null),
-    env.SNACKTIME_DB.get(K_IDEAS_LOCK),
-    env.SNACKTIME_DB.get(K_IDEAS_ERROR),
+    readJson<IdeasDoc | null>(env, kIdeas(scope), null),
+    env.SNACKTIME_DB.get(kIdeasLock(scope)),
+    env.SNACKTIME_DB.get(kIdeasError(scope)),
   ]);
   const generating = lock != null;
   const status: IdeasView["status"] = generating ? "generating" : cache && cache.ideas.length > 0 ? "ok" : "empty";
@@ -385,33 +411,34 @@ export async function getIdeasView(env: Env): Promise<IdeasView> {
  */
 export async function ensureFreshIdeas(
   env: Env,
+  scope: Scope,
   waitUntil: (p: Promise<unknown>) => void,
   force = false
 ): Promise<IdeasView> {
-  const foods = await readJson<FoodItem[]>(env, K_FOODS, []);
+  const foods = await readJson<FoodItem[]>(env, kFoods(scope), []);
   const soon = expiringSoon(foods);
-  const doc = await readJson<IdeasDoc | null>(env, K_IDEAS, null);
+  const doc = await readJson<IdeasDoc | null>(env, kIdeas(scope), null);
 
   const fresh =
     doc != null &&
     new Date(doc.generatedAt).toDateString() === new Date().toDateString() &&
     JSON.stringify(doc.foodSnapshot) === JSON.stringify(soon.map((f) => f.id).sort());
 
-  if (!force && fresh) return getIdeasView(env);
-  if (await env.SNACKTIME_DB.get(K_IDEAS_LOCK)) return getIdeasView(env); // one at a time
+  if (!force && fresh) return getIdeasView(env, scope);
+  if (await env.SNACKTIME_DB.get(kIdeasLock(scope))) return getIdeasView(env, scope); // one at a time
 
   // claim the generation lock (TTL clears it if the worker dies mid-run)
-  await env.SNACKTIME_DB.put(K_IDEAS_LOCK, String(Date.now()), { expirationTtl: 600 });
+  await env.SNACKTIME_DB.put(kIdeasLock(scope), String(Date.now()), { expirationTtl: 600 });
   const avoid = force && doc ? doc.ideas.map((i) => i.title) : [];
-  waitUntil(generateAndSave(env, soon, avoid));
-  return getIdeasView(env);
+  waitUntil(generateAndSave(env, scope, soon, avoid));
+  return getIdeasView(env, scope);
 }
 
-async function generateAndSave(env: Env, soon: FoodItem[], avoidTitles: string[]): Promise<void> {
+async function generateAndSave(env: Env, scope: Scope, soon: FoodItem[], avoidTitles: string[]): Promise<void> {
   try {
-    await env.SNACKTIME_DB.delete(K_IDEAS_ERROR);
+    await env.SNACKTIME_DB.delete(kIdeasError(scope));
     if (soon.length === 0) {
-      await env.SNACKTIME_DB.put(K_IDEAS, JSON.stringify({ generatedAt: new Date().toISOString(), generator: "none", foodSnapshot: [], ideas: [] }));
+      await kvPut(env, kIdeas(scope), JSON.stringify({ generatedAt: new Date().toISOString(), generator: "none", foodSnapshot: [], ideas: [] }), scope.ttl);
       return;
     }
     const singleFoods = soon.slice(0, 8);
@@ -453,19 +480,19 @@ async function generateAndSave(env: Env, soon: FoodItem[], avoidTitles: string[]
         foodSnapshot: soon.map((f) => f.id).sort(),
         ideas: result.ideas,
       };
-      await env.SNACKTIME_DB.put(K_IDEAS, JSON.stringify(doc));
+      await kvPut(env, kIdeas(scope), JSON.stringify(doc), scope.ttl);
       return;
     }
-    await env.SNACKTIME_DB.put(K_IDEAS_ERROR, `AI ideas failed after 2 attempts: ${attemptError ?? "unknown error"}`);
+    await kvPut(env, kIdeasError(scope), `AI ideas failed after 2 attempts: ${attemptError ?? "unknown error"}`, scope.ttl);
   } finally {
-    await env.SNACKTIME_DB.delete(K_IDEAS_LOCK);
+    await env.SNACKTIME_DB.delete(kIdeasLock(scope));
   }
 }
 
 /* ── Weekly email (dev stub → outbox in KV; wire real email in T12) ───── */
 
-export async function sendWeeklyDigest(env: Env): Promise<{ count: number; digest: string }> {
-  const foods = await readJson<FoodItem[]>(env, K_FOODS, []);
+export async function sendWeeklyDigest(env: Env, scope: Scope): Promise<{ count: number; digest: string }> {
+  const foods = await readJson<FoodItem[]>(env, kFoods(scope), []);
   const soon = foods.filter((f) => daysUntil(f.expDate) <= 7).sort((a, b) => a.expDate.localeCompare(b.expDate));
   const lines = [
     "Subject: SnackTime — food expiring in the next week",
@@ -482,6 +509,6 @@ export async function sendWeeklyDigest(env: Env): Promise<{ count: number; diges
   }
   lines.push("", "— The SnackTime", "");
   const digest = lines.join("\n");
-  await env.SNACKTIME_DB.put(K_OUTBOX_LATEST, digest);
+  await kvPut(env, kOutbox(scope), digest, scope.ttl);
   return { count: soon.length, digest };
 }

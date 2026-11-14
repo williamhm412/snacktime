@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ListScreen from "./screens/ListScreen";
 import AddScreen from "./screens/AddScreen";
 import IdeasScreen from "./screens/IdeasScreen";
+import WhoAreYou from "./screens/WhoAreYou";
+import { clearChoice, displayName, loadStoredChoice, type UserChoice } from "./user";
 
 export type Tab = "list" | "add" | "ideas";
 
@@ -43,22 +45,81 @@ const TITLES: Record<Tab, string> = {
   ideas: "Ideas",
 };
 
+function UserChip({ user, onSwitch }: { user: UserChoice; onSwitch: () => void }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // click anywhere outside the popover closes it
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [open]);
+
+  return (
+    <div className="user-chip-wrap" ref={wrapRef}>
+      <button className="user-chip" onClick={() => setOpen((o) => !o)} aria-label="Your profile">
+        <span className="user-chip-dot" />
+        {displayName(user)}
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div className="user-popover">
+          <p className="user-popover-hint">
+            {user === "guest"
+              ? "Guest session — everything is erased when you close this page."
+              : `${displayName(user)}'s pantry is saved in the cloud on every device.`}
+          </p>
+          <button className="user-popover-switch" onClick={onSwitch}>
+            Switch person
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState<Tab>("list");
+  const [user, setUser] = useState<UserChoice | null>(() => loadStoredChoice());
+
+  if (!user) {
+    return (
+      <div className="app">
+        <WhoAreYou onPicked={setUser} />
+      </div>
+    );
+  }
+
+  function switchPerson() {
+    clearChoice();
+    setUser(null); // back to the "Who are you?" screen
+    setTab("list");
+  }
+
   return (
     <div className="app">
       <header className="topbar">
-        <span className="brand">
-          <span className="brand-dot" /> SnackTime
-        </span>
+        <div className="topbar-row">
+          <span className="brand">
+            <span className="brand-dot" /> SnackTime
+          </span>
+          <UserChip user={user} onSwitch={switchPerson} />
+        </div>
         <h1 className="page-title">{TITLES[tab]}</h1>
       </header>
 
       <main className="content">
-        {/* keyed remount per tab keeps each screen's fetch-on-mount simple */}
-        {tab === "list" && <ListScreen key="list" />}
-        {tab === "add" && <AddScreen key="add" onAdded={() => setTab("list")} />}
-        {tab === "ideas" && <IdeasScreen key="ideas" />}
+        {/* keyed remount per tab keeps each screen's fetch-on-mount simple;
+            the user part of the key reloads everything when the person changes */}
+        {tab === "list" && <ListScreen key={`list:${user}`} />}
+        {tab === "add" && <AddScreen key={`add:${user}`} onAdded={() => setTab("list")} />}
+        {tab === "ideas" && <IdeasScreen key={`ideas:${user}`} />}
       </main>
 
       <nav className="tabbar">

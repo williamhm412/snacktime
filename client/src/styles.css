@@ -77,6 +77,83 @@ body {
   background: var(--green);
 }
 
+/* ── Top bar row: brand + user chip ────────────────────────────────────── */
+.topbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* subtle identity chip in the corner */
+.user-chip-wrap {
+  position: relative;
+}
+
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.user-chip:hover {
+  background: var(--green-soft);
+  color: var(--green-dark);
+}
+
+.user-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.user-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  width: 230px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+}
+
+.user-popover-hint {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.user-popover-switch {
+  width: 100%;
+  padding: 9px 0;
+  border: none;
+  border-radius: 10px;
+  background: var(--green-soft);
+  color: var(--green-dark);
+  font-size: 13.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.user-popover-switch:hover {
+  background: #d2eedd;
+}
+
 .page-title {
   margin: 2px 0 0;
   font-size: 27px;
@@ -824,4 +901,131 @@ body {
   font-size: 17px;
   font-weight: 700;
   margin: 0 0 4px;
+}
+
+/* ── "Who are you?" gate ───────────────────────────────────────────────── */
+.who-screen {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+}
+
+.who-card {
+  width: 100%;
+  max-width: 340px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  padding: 30px 24px 18px;
+  display: flex;
+  flex-direction: column;
+}
+
+.who-logo {
+  width: 14px;
+  height: 14px;
+  margin: 0 auto 12px;
+}
+
+.who-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  text-align: center;
+}
+
+.who-sub {
+  margin: 6px 0 18px;
+  font-size: 13.5px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.who-search {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--ink);
+  outline: none;
+}
+
+.who-search:focus {
+  border-color: var(--green);
+  background: var(--card);
+}
+
+.who-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.who-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.who-option:hover {
+  background: var(--green-soft);
+}
+
+.who-avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.who-avatar-guest {
+  background: var(--line);
+  color: var(--muted);
+}
+
+.who-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.who-option-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.who-option-note {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.who-empty {
+  padding: 14px 12px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
 }
