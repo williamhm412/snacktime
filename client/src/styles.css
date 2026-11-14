@@ -406,8 +406,10 @@ body {
   transform: rotate(0deg);
 }
 
-.food-group-body {
-  padding: 24px 0 2px 10px; /* roomy gap under the opened food header */
+/* .card-list (below) zeroes ul padding with equal specificity, so the class
+   combo is needed to actually win and keep room under the opened header */
+.card-list.food-group-body {
+  padding: 26px 0 2px 10px;
 }
 
 .idea-tappable:hover {
