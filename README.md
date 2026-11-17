@@ -5,7 +5,7 @@ Reduce food waste: log food + expiration dates, see what's expiring soon, and ge
 2 solo ideas per expiring food. Weekly digest emails coming (real sending = T12).
 
 **Live app:** https://snacktime.pages.dev
-**Repo:** https://github.com/williamhm412/snacktime (private)
+**Repo:** https://github.com/williamhm412/snacktime (public)
 
 ## Architecture
 
