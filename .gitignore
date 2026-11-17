@@ -4,3 +4,8 @@ dist/
 .wrangler/
 .dev.vars
 .DS_Store
+
+# local-only files (never commit: secrets & personal data)
+.env
+server/.env
+server/data/
