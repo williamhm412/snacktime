@@ -1,6 +1,12 @@
 TASKS — SnackTime (update this file as work progresses)
 Format: [ ] todo  [x] done  [-] dropped  [~] in progress / changed
 
+⚠️ STANDING REMINDER (added 2026-11-17, William): put a Google-login wall on
+the app SOON (T15 — Cloudflare Access on Pages, ~10 min, no code) — raise it
+at the start of every session until it's actually done. Until then the pantry
+at snacktime.pages.dev is world-editable, and the repo is public. Also still
+"watching" the un-rotated Gemini key (T40): rotate on any quota oddity.
+
 PHASE 1 — FOUNDATION (local Express version)
 [x] T1  Project skeleton: npm workspaces, TypeScript configs
 [x] T2  API: GET/POST/DELETE /api/foods + JSON file persistence
@@ -81,6 +87,11 @@ PHASE 4 — CLOUDFLARE + RENAME (2026-11-13)
       NOTE: users must reload the app once (old cached JS ≠ new API shape).
 [ ] T15 Multiple users / accounts — PARTIALLY done via T37; real auth
       (magic links / Cloudflare Access) still open if ever needed
+      ➜ USER WANTS THE GOOGLE-LOGIN WALL SOON (Cloudflare Access on Pages,
+        free, ~10 min, zero code). REMIND UNTIL DONE. (asked 2026-11-17)
+[~] T40 Gemini key not rotated after repo-public history purge (2026-11-17):
+      user chose to wait — WATCH usage; rotate via AI Studio + wrangler secret
+      put if any quota spike / suspicious use.
 [ ] T35 Optional: connect Pages to the GitHub repo for auto-deploy on push (1-click
       in Cloudflare dashboard → Pages → snacktime → Build settings)
 [ ] T36 Optional: custom domain (e.g. snacktime.yourdomain.com)
