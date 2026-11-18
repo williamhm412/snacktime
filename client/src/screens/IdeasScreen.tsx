@@ -145,7 +145,7 @@ function InfoSheet({ onClose }: { onClose: () => void }) {
         <h2>How Ideas works</h2>
         <ul>
           <li><b>Three views of your food.</b> <b>“Expiring”</b> (default) plans meals around food within 7 days of expiring. <b>“Use It All”</b> plans meals around your WHOLE pantry, whatever the dates. <b>“Ideas by Food”</b> gives every food 2 quick solo ideas, regardless of expiry.</li>
-          <li><b>Ideas are generated when you open this tab</b> and your food list has changed since the last batch (or it's a new day) — and whenever you tap ↻. Editing your list elsewhere won't burn AI quota until you actually come looking for recipes.</li>
+          <li><b>Recipes refresh once per day</b> — on the first time you open the app that day. The rest of the day, this batch stays put even if your list changes, so nothing burns AI quota behind your back. Want something new mid-day? Just tap ↻.</li>
           <li><b>Tap ↻</b> for a brand-new batch — the AI is told the current ideas and won't repeat any of them.</li>
           <li><b>Pantry staples are assumed</b> — oil, salt, spices, rice, pasta, onions, garlic and the like. The ingredient list shows what you'd still need to buy.</li>
           <li><b>Units toggle:</b> flip between volume (cups/tsp) and weight (g/ml) inside any open recipe. Estimates are approximate — cook with your eyes and nose.</li>

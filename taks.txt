@@ -104,6 +104,17 @@ PHASE 4 — CLOUDFLARE + RENAME (2026-11-13)
       delivered 18 valid ideas — self-healing chain verified.
       Still open: WATCH free-tier headroom (T40); revisit card only if
       throttling becomes a daily annoyance.
+[x] T42 Once-per-day regeneration (2026-11-18, supersedes T41's lazy-trigger
+      detail): refresh = first app OPEN of the day only (any tab), not Ideas
+      tab, not list changes. isFreshDoc() = "generated today" only (food
+      snapshots ignored); mid-day pantry edits wait for tomorrow or ↻.
+      App.tsx fires refreshIdeas(false) on mount/user-change; IdeasScreen
+      poller still revives dead generations. InfoSheet wording updated.
+      Verified: cfdev mock run (empty→gen True, same-day False, mid-day edit
+      still False, force True) + prod check (today's 18-idea batch held,
+      startGeneration False).
+      Still open: WATCH free-tier headroom (T40); revisit card only if
+      throttling becomes a daily annoyance.
 [ ] T35 Optional: connect Pages to the GitHub repo for auto-deploy on push (1-click
       in Cloudflare dashboard → Pages → snacktime → Build settings)
 [ ] T36 Optional: custom domain (e.g. snacktime.yourdomain.com)

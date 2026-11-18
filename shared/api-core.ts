@@ -465,22 +465,19 @@ function lockIsFresh(raw: string | null): boolean {
   return Number.isFinite(t) && Date.now() - t < LOCK_FRESH_MS;
 }
 
-function isFreshDoc(doc: IdeasDoc | null, allFoods: FoodItem[], soon: FoodItem[]): boolean {
-  return (
-    doc != null &&
-    new Date(doc.generatedAt).toDateString() === new Date().toDateString() &&
-    JSON.stringify(doc.foodSnapshot) === JSON.stringify(allFoods.map((f) => f.id).sort()) &&
-    JSON.stringify(doc.expiringSnapshot) === JSON.stringify(soon.map((f) => f.id).sort())
-  );
+function isFreshDoc(doc: IdeasDoc | null): boolean {
+  /* Once-a-day rule (William's choice): a batch generated today stays fresh
+     all day, even if the list changes mid-day. New day + first app open =
+     regenerate. Mid-day cravings handled by ↻. Snapshots kept in the doc for
+     info/debug only. */
+  return doc != null && new Date(doc.generatedAt).toDateString() === new Date().toDateString();
 }
 
 export async function refreshIdeasView(env: Env, scope: Scope, force = false): Promise<RefreshResult> {
-  const foods = await readJson<FoodItem[]>(env, kFoods(scope), []);
-  const soon = expiringSoon(foods);
   const doc = await readJson<IdeasDoc | null>(env, kIdeas(scope), null);
   const view = await getIdeasView(env, scope);
 
-  if (!force && isFreshDoc(doc, foods, soon)) return { view, startGeneration: false };
+  if (!force && isFreshDoc(doc)) return { view, startGeneration: false };
   if (lockIsFresh(await env.SNACKTIME_DB.get(kIdeasLock(scope)))) return { view, startGeneration: false };
 
   return { view: { ...view, status: "generating", generating: true }, startGeneration: true };
@@ -488,13 +485,13 @@ export async function refreshIdeasView(env: Env, scope: Scope, force = false): P
 
 /** Synchronous generation — the caller's open request keeps this alive. */
 export async function generateIdeasNow(env: Env, scope: Scope, force: boolean): Promise<IdeasView> {
-  const foods = await readJson<FoodItem[]>(env, kFoods(scope), []);
-  const soon = expiringSoon(foods);
   const doc = await readJson<IdeasDoc | null>(env, kIdeas(scope), null);
 
-  if (!force && isFreshDoc(doc, foods, soon)) return getIdeasView(env, scope);
+  if (!force && isFreshDoc(doc)) return getIdeasView(env, scope);
   if (lockIsFresh(await env.SNACKTIME_DB.get(kIdeasLock(scope)))) return getIdeasView(env, scope);
 
+  const foods = await readJson<FoodItem[]>(env, kFoods(scope), []);
+  const soon = expiringSoon(foods);
   await env.SNACKTIME_DB.put(kIdeasLock(scope), String(Date.now()), { expirationTtl: 180 });
   const avoid = force && doc ? doc.ideas.map((i) => i.title) : [];
   await generateAndSave(env, scope, foods, soon, avoid);

@@ -36,9 +36,11 @@ Notes:
   output is retried once, then rejected with a friendly error.
 - AI ideas: three tabs — **Expiring** (default; meals around food ≤7 days out),
   **Use It All** (meals around the whole pantry, any dates), **By Food** (2 solo
-  ideas per food). Generation is client-driven AND lazy: the AI only runs when
-  the Ideas tab opens with a changed list (or ↻). Model: gemini-3.5-flash-lite
-  (fallback 3.1-flash-lite), maxOutputTokens 16k with token-budget prompt rules.
+  ideas per food). Generation is client-driven and ONCE PER DAY: the AI runs on
+  the first app open of a day (any tab) or on the manual ↻ button; a batch
+  generated today stays put all day even if the pantry changes mid-day.
+  Model: gemini-3.5-flash-lite (fallback 3.1-flash-lite), maxOutputTokens 16k
+  with token-budget prompt rules.
 - Weekly email is a dev stub (digest saved to KV `outbox:latest`). Pages has no
   cron — wire real email + a scheduler in T12 (options: external cron hitting
   `/api/email/send-now`, or move to a full Worker with Cron Triggers).

@@ -3,6 +3,7 @@ import ListScreen from "./screens/ListScreen";
 import AddScreen from "./screens/AddScreen";
 import IdeasScreen from "./screens/IdeasScreen";
 import WhoAreYou from "./screens/WhoAreYou";
+import { refreshIdeas } from "./api";
 import { clearChoice, displayName, loadStoredChoice, type UserChoice } from "./user";
 
 export type Tab = "list" | "add" | "ideas";
@@ -87,6 +88,14 @@ function UserChip({ user, onSwitch }: { user: UserChoice; onSwitch: () => void }
 export default function App() {
   const [tab, setTab] = useState<Tab>("list");
   const [user, setUser] = useState<UserChoice | null>(() => loadStoredChoice());
+
+  // Once-a-day AI refresh: the first app open each day (any tab) asks the
+  // backend for a fresh batch; the server considers today's batch fresh after
+  // that, so the rest of the day's opens are free. Mid-day = ↻ button only.
+  useEffect(() => {
+    if (!user) return;
+    refreshIdeas(false).catch(() => {});
+  }, [user]);
 
   if (!user) {
     return (
