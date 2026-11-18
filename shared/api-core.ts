@@ -229,7 +229,14 @@ function validateIdeas(raw: unknown, knownIds: Set<string>): { ideas: RecipeIdea
 
 export interface AiFood { id: string; name: string; expDate: string; daysLeft: number }
 
-const MODEL = (env: Env) => env.GEMINI_MODEL?.trim() || "gemini-3.5-flash";
+// lite-first: the cheaper/faster family survives free-tier demand spikes far better
+// than the flagship, and if it 503s we fall back to the older lite (attempt 2).
+const MODEL = (env: Env) => env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
+const FALLBACK_MODEL = "gemini-3.1-flash-lite";
+
+// Hard cap so one batch can never eat the whole daily quota. Sized for a full
+// ~22-idea batch written lean (see the TOKEN BUDGET rules in buildPrompt).
+const MAX_OUTPUT_TOKENS = 16_000;
 
 const RESPONSE_SCHEMA = {
   type: "object",
@@ -298,6 +305,7 @@ The user already saw and passed on these ideas — do NOT reuse or slightly-rena
 ${avoidTitles.map((t) => `- ${t}`).join("\n")}
 ` : ""}
 Rules:
+- TOKEN BUDGET: your entire response is hard-capped at ${MAX_OUTPUT_TOKENS} tokens and will be CUT OFF if longer, which ruins the whole batch. To guarantee every idea fits: max 6 instructions per recipe, one short sentence each; max 8 ingredients; terse one-sentence whyThisOne and comments. Prefer finishing well over being detailed. Never emit incomplete JSON.
 - Every idea object needs ALL schema fields, including "set" ("expiring" for Section A, "pantry" for Section B).
 - Pantry staples are assumed on hand: oil, butter, salt, pepper, soy sauce, vinegar, sugar, honey, flour, rice, pasta, oats, common spices, onions, garlic, lemons. Only list other ingredients that are truly needed, always with amounts.
 - Every ingredient needs BOTH measures where sensible: "volume" in US units (cups/tbsp/tsp, or counting units like qty:2 unit:"cloves" or qty:2 unit:"medium") and "weight" in metric (g or ml). Use null for whichever genuinely doesn't apply. Put prep notes like "diced" in volume.note.
@@ -310,10 +318,10 @@ ${priorError ? `\nYour previous attempt failed validation: ${priorError}. Fix it
 Return ONLY the JSON object matching the schema — no markdown fences, no commentary.`;
 }
 
-async function generateWithGemini(env: Env, prompt: string): Promise<string> {
+async function generateWithGemini(env: Env, prompt: string, model: string): Promise<string> {
   const key = env.GEMINI_API_KEY?.trim();
   if (!key) throw new Error("GEMINI_API_KEY is not set");
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL(env)}:generateContent`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -321,7 +329,7 @@ async function generateWithGemini(env: Env, prompt: string): Promise<string> {
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: 'You are a creative, practical home-cook assistant inside "SnackTime", an app that helps people eat their food before it goes bad. You always reply with ONLY a JSON object matching the required schema — no markdown, no commentary.' }] },
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.9, responseMimeType: "application/json", responseSchema: RESPONSE_SCHEMA },
+      generationConfig: { temperature: 0.9, responseMimeType: "application/json", responseSchema: RESPONSE_SCHEMA, maxOutputTokens: MAX_OUTPUT_TOKENS },
     }),
   });
   if (!res.ok) {
@@ -517,8 +525,10 @@ async function generateAndSave(env: Env, scope: Scope, allFoods: FoodItem[], soo
       let generator: string;
       try {
         if (env.GEMINI_API_KEY?.trim()) {
-          text = await generateWithGemini(env, buildPrompt(expiringAi, extrasAi, attemptError, avoidTitles));
-          generator = `gemini:${MODEL(env)}`;
+          // attempt 1: configured lite model · attempt 2: older lite fallback
+          const model = attempt === 1 ? MODEL(env) : FALLBACK_MODEL;
+          text = await generateWithGemini(env, buildPrompt(expiringAi, extrasAi, attemptError, avoidTitles), model);
+          generator = `gemini:${model}`;
         } else {
           text = generateWithMock(expiringAi, extrasAi);
           generator = "mock";
@@ -531,7 +541,7 @@ async function generateAndSave(env: Env, scope: Scope, allFoods: FoodItem[], soo
       try {
         parsed = JSON.parse(text);
       } catch {
-        attemptError = "response was not valid JSON — return ONLY the JSON object";
+        attemptError = "response was not valid JSON (it may have been cut off by the token budget — make every recipe shorter: max 5 instructions, shorter sentences) — return ONLY the complete JSON object";
         continue;
       }
       const result = validateIdeas(parsed, knownIds);

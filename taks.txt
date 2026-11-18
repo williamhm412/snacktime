@@ -92,6 +92,18 @@ PHASE 4 — CLOUDFLARE + RENAME (2026-11-13)
 [~] T40 Gemini key not rotated after repo-public history purge (2026-11-17):
       user chose to wait — WATCH usage; rotate via AI Studio + wrangler secret
       put if any quota spike / suspicious use.
+[x] T41 Free-tier survival diet (2026-11-18): key started 429 quota-exceeded +
+      fleet-wide 503 "high demand" (free tier throttling; usage ≈ legit family
+      use, worsened by T38 regenerating on every pantry edit). User declined a
+      billing card → changes: LAZY generation (AI runs only when the Ideas tab
+      opens or ↻ — add/use taps no longer regenerate); MAX_OUTPUT_TOKENS
+      16,000 hard cap + explicit TOKEN BUDGET rules in the prompt (max 6
+      one-sentence steps, ≤8 ingredients) + truncation-aware retry message;
+      default model → gemini-3.5-flash-lite, attempt-2 fallback →
+      gemini-3.1-flash-lite. First live run: attempt 1 lite 503'd, fallback
+      delivered 18 valid ideas — self-healing chain verified.
+      Still open: WATCH free-tier headroom (T40); revisit card only if
+      throttling becomes a daily annoyance.
 [ ] T35 Optional: connect Pages to the GitHub repo for auto-deploy on push (1-click
       in Cloudflare dashboard → Pages → snacktime → Build settings)
 [ ] T36 Optional: custom domain (e.g. snacktime.yourdomain.com)

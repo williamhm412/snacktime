@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { deleteFood, fetchFoods, refreshIdeas } from "../api";
+import { deleteFood, fetchFoods } from "../api";
 import { expiryBadge, formatExpDate, addedAgo } from "../dates";
 import type { FoodItem, SortMode } from "../types";
 
@@ -25,7 +25,6 @@ export default function ListScreen() {
     setFoods((prev) => prev?.filter((f) => f.id !== id) ?? prev);
     try {
       await deleteFood(id);
-      refreshIdeas(false).catch(() => {}); // background: keep ideas in sync
     } catch (e) {
       setError((e as Error).message);
       load(); // roll back
